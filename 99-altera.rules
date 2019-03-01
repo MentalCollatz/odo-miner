@@ -1,0 +1,9 @@
+# For Altera USB-Blaster permissions.
+# On the last line, change the 1000 to your user name or id.
+SUBSYSTEM=="usb",\
+ENV{DEVTYPE}=="usb_device",\
+ATTR{idVendor}=="09fb",\
+ATTR{idProduct}=="6001|6002|6003|6010|6810",\
+NAME="bus/usb/$env{BUSNUM}/$env{DEVNUM}",\
+RUN+="/bin/chown 1000 %N"
+

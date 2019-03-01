@@ -1,0 +1,6 @@
+*.[oa]
+*.db_info
+src/verilog/odo_gen
+src/pool/fakepool
+src/projects/*/build_files/*
+src/projects/*/output_files/*
