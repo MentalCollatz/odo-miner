@@ -9,7 +9,7 @@ Currently only supports Intel (Altera) FPGAs on Linux hosts.
 Installing Quartus Prime
 ------------------------
 
-Quartus prime is required to both compile and run this miner.  It is currently available at
+Quartus Prime is required to both compile and run this miner.  It is currently available at
 <https://fpgasoftware.intel.com/> .  To figure out what edition you need, check the device
 support list.  To minimize your download, choose the Individual Files tab, then download only
 Quartus Prime, and the device support files for the devices you're using.  Install according
@@ -42,4 +42,9 @@ Notice: It is highly recommended that you remove the acrylic cover on your devel
 Starting to Mine
 ----------------
 
-TODO.  For now, try running the command ``./compile.sh cyclone_v_gx_starter_kit 0`` to compile a test file.
+This will require multiple terminal windows.  A screen multiplexer such as ``tmux`` or ``screen`` may make things easier for you.
+
+* In one terminal, go to the ``src`` directory and run ``./autocompile.sh --testnet cyclone_v_gx_starter_kit``
+* In another terminal, go to the ``src/pool`` directory and run ``make fakepool`` followed by ``./fakepool --testnet``
+* Finally, for each mining fpga open a terminal in the ``src/miner`` directory and run ``$QUARTUSPATH/quartus_stp -t mine.tcl``
+
