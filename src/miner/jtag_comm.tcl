@@ -185,11 +185,11 @@ proc reverse_hex {hex_str} {
 }
 
 proc write_instance {name value} {
-    return [write_source_data -instance_index [instance_id $name] -value_in_hex -value [reverse_hex $value]]
+    return [keep_trying 5 write_source_data -instance_index [instance_id $name] -value_in_hex -value [reverse_hex $value]]
 }
 
 proc read_instance {name} {
-    return [reverse_hex [read_probe_data -instance_index [instance_id $name] -value_in_hex]]
+    return [reverse_hex [keep_trying 5 read_probe_data -instance_index [instance_id $name] -value_in_hex]]
 }
 
 proc instance_exists {name} {

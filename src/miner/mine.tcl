@@ -15,6 +15,7 @@
 
 package require http
 
+source utils.tcl
 source jtag_comm.tcl
 source config.tcl
 
