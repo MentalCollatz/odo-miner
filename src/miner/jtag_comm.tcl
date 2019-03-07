@@ -14,18 +14,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+source utils.tcl
+source projects.tcl
+
 # User API Functions
 # These should be generic and be the same no matter what the underlying FPGA is.
 # Use these to interact with the FPGA.
 
 # Program the FPGA with the specified .sof file
-proc program_fpga {hardware_name sof_name} {
+proc program_fpga {hardware_name sof_name chain_pos} {
     post_message -type info "Programming $hardware_name with $sof_name"
 
     # cancel any existing sources and probes
     catch end_insystem_source_probe
 
-    if {[catch {exec quartus_pgm -c $hardware_name -m JTAG -o "P;$sof_name"} result]} {
+    if {[catch {exec quartus_pgm -c $hardware_name -m JTAG -o "P;$sof_name@$chain_pos"} result]} {
         post_message -type error "Programming failed:"
         puts $result
         return 0
@@ -35,11 +38,8 @@ proc program_fpga {hardware_name sof_name} {
     }
 }
 
-# Find the appropriate .sof file for the given hardware and seed
-proc get_sof_name {hardware_name seed} {
-    # TODO: support more boards
-    # TODO: automatically identify correct device
-    return "../projects/cyclone_v_gx_starter_kit/output_files/miner_$seed.sof"
+proc identify_project {hardware_name} {
+    return [get_project $hardware_name [get_device_names -hardware_name $hardware_name]]
 }
 
 # Initialize the FPGA
@@ -120,8 +120,12 @@ proc select_hardware {} {
         puts "$len) $hardware_name"
         incr len
 
-        foreach device_name [get_device_names -hardware_name $hardware_name] {
-            puts "\t$device_name"
+        if {[catch {
+            foreach device_name [get_device_names -hardware_name $hardware_name] {
+                puts "\t$device_name"
+            }
+        } exc]} {
+            puts "\tError: Unable to get device names"
         }
     }
 
@@ -168,8 +172,6 @@ proc find_instances {hardware_name device_name} {
         }
 
     } exc]} {
-        post_message -type error "find_instances failed:"
-        puts $exc
         set fpga_instances [dict create]
     }
 }

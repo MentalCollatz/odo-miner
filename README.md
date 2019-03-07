@@ -42,9 +42,9 @@ Notice: It is highly recommended that you remove the acrylic cover on your devel
 Starting to Mine
 ----------------
 
-This will require multiple terminal windows.  A screen multiplexer such as ``tmux`` or ``screen`` may make things easier for you.
+This will require multiple terminal windows.  A screen multiplexer such as [tmux](https://github.com/tmux/tmux/wiki) or [screen](https://www.gnu.org/software/screen/) may make things easier for you.
 
-* In one terminal, go to the ``src`` directory and run ``./autocompile.sh --testnet cyclone_v_gx_starter_kit``
+* In one terminal, go to the ``src`` directory and run ``./autocompile.sh --testnet cyclone_v_gx_starter_kit de10_nano``
 * In another terminal, go to the ``src/pool`` directory and run ``make fakepool`` followed by ``./fakepool --testnet``
 * Finally, for each mining fpga open a terminal in the ``src/miner`` directory and run ``$QUARTUSPATH/quartus_stp -t mine.tcl``
 

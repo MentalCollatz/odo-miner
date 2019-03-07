@@ -15,7 +15,6 @@
 
 package require http
 
-source utils.tcl
 source jtag_comm.tcl
 source config.tcl
 
@@ -35,6 +34,7 @@ proc advance_epoch {seed} {
     global last_seed
     global last_warning
     global hardware_name
+    global project_config
     if {$last_seed != ""} {
         post_message -type info "Results for last epoch:"
         dict for {key value} $epoch_results {
@@ -43,7 +43,7 @@ proc advance_epoch {seed} {
         }
         set last_seed ""
     }
-    set sof [get_sof_name $hardware_name $seed]
+    set sof [get_sof_name [lindex $project_config 0] $seed]
     if {![file exists $sof]} {
         if {$seed != $last_warning} {
             post_message -type warning "file $sof does not exist, unable to mine."
@@ -51,7 +51,7 @@ proc advance_epoch {seed} {
         }
         return 0
     }
-    if {![program_fpga $hardware_name $sof] || ![fpga_init $hardware_name]} {
+    if {![program_fpga $hardware_name $sof [lindex $project_config 1]] || ![fpga_init $hardware_name]} {
         return 0
     }
     set last_seed $seed
@@ -114,6 +114,7 @@ proc submit_work {conn work} {
 # of available hardware to choose from.
 proc choose_hardware {argv} {
     global hardware_name
+    global project_config
     global miner_id
     if {[llength $argv] == 1} {
         set hardware_name [lindex $argv 0]
@@ -121,6 +122,11 @@ proc choose_hardware {argv} {
         set hardware_name [select_hardware]
     }
     set miner_id [lindex [split $hardware_name] 1]
+    set project_config [identify_project $hardware_name]
+    if {$project_config == ""} {
+        post_message -type error "Unable to identify project for hardware"
+        qexit -error
+    }
 }
 
 # Create a connection to the pool (or bridge, as will likely be the case)

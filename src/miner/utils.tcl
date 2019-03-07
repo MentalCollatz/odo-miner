@@ -13,14 +13,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-proc keep_trying {retries command args} {
+proc keep_trying {attempts command args} {
     while {1} {
         if {[catch {$command {*}$args} res]} {
             set res [string trim $res]
             post_message -type warning "Command `$command $args` failed:"
             puts $res
-            if {$retries > 0} {
-                incr retries -1
+            incr attempts -1
+            if {$attempts > 0} {
                 after 1
             } else {
                 post_message -type error "Too many failures, aborting"
