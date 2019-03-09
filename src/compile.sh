@@ -51,9 +51,20 @@ source "projects/$PROJECT/params.sh"
 BUILDDIR="projects/$PROJECT/build_files"
 PROJFILE="$BUILDDIR/miner_$SEED.qsf"
 
+# If this is not our first attempt, change the fitter seed
+FITTER_SEED=1
+if [ -e "$PROJFILE" ]
+then
+    FITTER_SEED=$(awk '{ if ($3 == "SEED") { print $4; exit } }' "$PROJFILE")
+    ((FITTER_SEED++)) || true
+fi
+
 ( cd verilog && make odo_gen )
 mkdir -p "$BUILDDIR"
-sed -e s/SEED/$SEED/ -e s/_THROUGHPUT/$THROUGHPUT/ < "projects/$PROJECT/project.txt" > "$PROJFILE"
+(
+export FAMILY DEVICE THROUGHPUT CLK_PIN PLL_FILE SEED FITTER_SEED
+envsubst < "projects/altera_template.txt" > "$PROJFILE"
+)
 verilog/odo_gen "$SEED" "$THROUGHPUT" "odo_" > "$BUILDDIR/odo_$SEED.v"
 
 "$EXECUTABLE" --flow compile "$PROJFILE"

@@ -1,18 +1,17 @@
-set_global_assignment -name FAMILY "Cyclone V"
-set_global_assignment -name DEVICE 5CSEBA6U23I7
+set_global_assignment -name FAMILY "${FAMILY}"
+set_global_assignment -name DEVICE ${DEVICE}
 set_global_assignment -name TOP_LEVEL_ENTITY miner_top
-set_location_assignment PIN_V11 -to osc_clk
+set_location_assignment ${CLK_PIN} -to osc_clk
 
-# These two lines will automatically be corrected
-set_global_assignment -name VERILOG_MACRO "THROUGHPUT=_THROUGHPUT"
-set_global_assignment -name VERILOG_MACRO "ODOKEY=SEED"
+set_global_assignment -name VERILOG_MACRO "THROUGHPUT=${THROUGHPUT}"
+set_global_assignment -name VERILOG_MACRO "ODOKEY=${SEED}"
+set_global_assignment -name SEED ${FITTER_SEED}
 
 set_global_assignment -name VERILOG_FILE ../../../verilog/alt_probe.v
 set_global_assignment -name VERILOG_FILE ../../../verilog/keccak800.v
 set_global_assignment -name VERILOG_FILE ../../../verilog/miner.v
-set_global_assignment -name VERILOG_FILE ../pll_150.v
-# This file name will automatically be replaced with the correct name
-set_global_assignment -name VERILOG_FILE odo_SEED.v
+set_global_assignment -name VERILOG_FILE ../${PLL_FILE}
+set_global_assignment -name VERILOG_FILE odo_${SEED}.v
 set_global_assignment -name SDC_FILE ../miner.sdc
 set_global_assignment -name NUM_PARALLEL_PROCESSORS 1
 

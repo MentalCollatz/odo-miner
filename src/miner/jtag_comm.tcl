@@ -93,10 +93,11 @@ proc get_result_from_fpga {} {
     }
 }
 
-# Currently unused.  TODO: on startup, see if the FPGA is alread running the
-# correct seed and skip reprogramming it.
+# Get the seed of the current design, if it reports it.
 proc get_fpga_seed {} {
-    return [read_instance SEED]
+    if {[instance_exists SEED]} {
+        return [expr 0x[reverse_hex [read_instance SEED]]]
+    }
 }
 
 # Variable target mining is supported.

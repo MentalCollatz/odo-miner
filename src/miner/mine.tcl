@@ -46,7 +46,8 @@ proc advance_epoch {seed} {
     set sof [get_sof_name [lindex $project_config 0] $seed]
     if {![file exists $sof]} {
         if {$seed != $last_warning} {
-            post_message -type warning "file $sof does not exist, unable to mine."
+            post_message -type warning "File $sof does not exist, unable to mine."
+            post_message -type warning "Please ensure autocompile.sh is running."
             set last_warning $seed
         }
         return 0
@@ -153,6 +154,9 @@ proc wait_for_nonce {conn} {
 }
 
 choose_hardware $argv
+#if {[fpga_init $hardware_name]} {
+#    set last_seed [get_fpga_seed]
+#}
 set conn [create_pool_conn $config_host $config_port]
 wait_for_nonce $conn
 
