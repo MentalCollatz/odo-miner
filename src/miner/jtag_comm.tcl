@@ -61,8 +61,8 @@ set fpga_last_nonce ""
 proc push_work_to_fpga {work} {
     global fpga_current_work
 
-    write_instance "WRK1" [string range $work 0 71]
-    write_instance "WRK2" [string range $work 72 151]
+    write_instance "WRK1" [reverse_hex [string range $work 0 71]]
+    write_instance "WRK2" [reverse_hex [string range $work 72 151]]
     set fpga_current_work [string range $work 0 151]
 
     # Reset the last nonce.  This isn't strictly necessary, but prevents a race
@@ -85,7 +85,7 @@ proc get_result_from_fpga {} {
         return
     }
 
-    set golden_nonce [read_instance GNON]
+    set golden_nonce [reverse_hex [read_instance GNON]]
 
     if {$golden_nonce ne $fpga_last_nonce} {
         set fpga_last_nonce $golden_nonce
@@ -96,7 +96,7 @@ proc get_result_from_fpga {} {
 # Get the seed of the current design, if it reports it.
 proc get_fpga_seed {} {
     if {[instance_exists SEED]} {
-        return [expr 0x[reverse_hex [read_instance SEED]]]
+        return [expr 0x[read_instance SEED]]
     }
 }
 
@@ -188,11 +188,11 @@ proc reverse_hex {hex_str} {
 }
 
 proc write_instance {name value} {
-    return [keep_trying 5 write_source_data -instance_index [instance_id $name] -value_in_hex -value [reverse_hex $value]]
+    return [keep_trying 5 write_source_data -instance_index [instance_id $name] -value_in_hex -value $value]
 }
 
 proc read_instance {name} {
-    return [reverse_hex [keep_trying 5 read_probe_data -instance_index [instance_id $name] -value_in_hex]]
+    return [keep_trying 5 read_probe_data -instance_index [instance_id $name] -value_in_hex]
 }
 
 proc instance_exists {name} {

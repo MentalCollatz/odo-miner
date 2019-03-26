@@ -72,13 +72,16 @@ bool HashLess(const uint8_t hash1[32], const uint8_t hash2[32])
 #define CHECK(cond, msg) do {if (!(cond)) { perror(msg ": "); goto cleanup; } }while(0)
 
 template<size_t bytes>
-void ToHex(const uint8_t (&binStr)[bytes], char hexStr[])
+void ToHex(const uint8_t (&binStr)[bytes], char hexStr[], bool reversed = false)
 {
     static const char* hexChar = "0123456789ABCDEF";
+    char *opos = reversed ? hexStr + 2*bytes : hexStr;
     for (size_t i = 0; i < bytes; i++)
     {
-        hexStr[2*i] = hexChar[binStr[i] >> 4];
-        hexStr[2*i+1] = hexChar[binStr[i] & 0xf];
+        if (reversed) opos -= 2;
+        opos[0] = hexChar[binStr[i] >> 4];
+        opos[1] = hexChar[binStr[i] & 0xf];
+        if (!reversed) opos += 2;
     }
     hexStr[2*bytes] = 0;
 }
@@ -108,7 +111,7 @@ void FakePool(int conn, int epochLength)
         key -= key % epochLength;
         char headerHex[161], targetHex[65];
         ToHex(header, headerHex);
-        ToHex(target, targetHex);
+        ToHex(target, targetHex, true);
         char workBuf[256];
         sprintf(workBuf, "work %s %s %d\n", headerHex, targetHex, key);
         SendStr(conn, workBuf);
@@ -150,10 +153,10 @@ void FakePool(int conn, int epochLength)
                         ToHex(solvedHeader, hexBuf);
                         fprintf(stderr, "Bad submission: %s\n", hexBuf);
                         fprintf(stderr, "Seed = %d\n", key);
-                        ToHex(target, hexBuf);
-                        fprintf(stderr, "Target = %s (Little Endian)\n", hexBuf);
-                        ToHex(hash, hexBuf);
-                        fprintf(stderr, "Hash   = %s (Little Endian)\n", hexBuf);
+                        ToHex(target, hexBuf, true);
+                        fprintf(stderr, "Target = %s\n", hexBuf);
+                        ToHex(hash, hexBuf, true);
+                        fprintf(stderr, "Hash   = %s\n", hexBuf);
                         result = "bad";
                     }
                 }
