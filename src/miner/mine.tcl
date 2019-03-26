@@ -35,6 +35,13 @@ proc advance_epoch {seed} {
     global last_warning
     global hardware_name
     global project_config
+    if {$seed == 0} {
+        if {$seed != $last_warning} {
+            post_message -type warning "Pool is unable to provide work."
+            set last_warning $seed
+        }
+        return 0
+    }
     if {$last_seed != ""} {
         post_message -type info "Results for last epoch:"
         dict for {key value} $epoch_results {
@@ -62,6 +69,7 @@ proc advance_epoch {seed} {
 
 proc set_work {data target seed} {
     global last_seed
+    global last_warning
     if {$seed != $last_seed} {
         if {![advance_epoch $seed]} {
             clear_fpga_work
@@ -70,24 +78,29 @@ proc set_work {data target seed} {
     }
     set_work_target $target
     push_work_to_fpga $data
+    if {$last_warning == 0} {
+        post_message -type info "Received work from pool."
+        set last_warning ""
+    }
 }
 
 proc add_result {status} {
     global epoch_results
     dict incr epoch_results $status
     if {$status eq "accepted"} {
-        post_message -type info "result accepted"
-    } elseif {$status eq "stale"} {
-        post_message -type warning "result stale"
-    } elseif {$status eq "bad"} {
-        post_message -type error "result bad"
+        set type info
+    } elseif {$status eq "stale" || $status eq "inconclusive"} {
+        set type warning
+    } else {
+        set type error
     }
+    post_message -type $type "result $status"
 }
 
 proc receive_data {conn} {
     fconfigure $conn -blocking 1
     gets $conn data
-    if {$data == ""} {
+    if {$data eq ""} {
         post_message -type error "Lost connection to pool"
         qexit -error
     }
@@ -124,7 +137,7 @@ proc choose_hardware {argv} {
     }
     set miner_id [lindex [split $hardware_name] 1]
     set project_config [identify_project $hardware_name]
-    if {$project_config == ""} {
+    if {$project_config eq ""} {
         post_message -type error "Unable to identify project for hardware"
         qexit -error
     }
