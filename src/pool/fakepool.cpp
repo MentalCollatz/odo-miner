@@ -149,15 +149,42 @@ void FakePool(int conn, int epochLength)
                     }
                     else
                     {
-                        char hexBuf[161];
-                        ToHex(solvedHeader, hexBuf);
-                        fprintf(stderr, "Bad submission: %s\n", hexBuf);
-                        fprintf(stderr, "Seed = %d\n", key);
-                        ToHex(target, hexBuf, true);
-                        fprintf(stderr, "Target = %s\n", hexBuf);
-                        ToHex(hash, hexBuf, true);
-                        fprintf(stderr, "Hash   = %s\n", hexBuf);
-                        result = "bad";
+                        bool found = false;
+                        for (int pos = 76; pos < 80 && !found; pos++)
+                        {
+                            for (int i = 1; i < 256; i++)
+                            {
+                                solvedHeader[pos] ^= i;
+                                uint8_t hash2[32];
+                                HashOdo(hash2, solvedHeader, solvedHeader+80, key);
+                                if (!HashLess(target, hash2))
+                                {
+                                    fprintf(stderr, "bits flipped:");
+                                    for (int bit = 0; bit < 8; bit++)
+                                    {
+                                        if (i & (1<<bit))
+                                            fprintf(stderr, " %d", 8*(pos-76) + bit);
+                                    }
+                                    fprintf(stderr, "\n");
+                                    found = true;
+                                    result = "corrupted";
+                                    break;
+                                }
+                                solvedHeader[pos] ^= i;
+                            }
+                        }
+                        if (!found)
+                        {
+                            char hexBuf[161];
+                            ToHex(solvedHeader, hexBuf);
+                            fprintf(stderr, "Bad submission: %s\n", hexBuf);
+                            fprintf(stderr, "Seed = %d\n", key);
+                            ToHex(target, hexBuf, true);
+                            fprintf(stderr, "Target = %s\n", hexBuf);
+                            ToHex(hash, hexBuf, true);
+                            fprintf(stderr, "Hash   = %s\n", hexBuf);
+                            result = "bad";
+                        }
                     }
                 }
                 sprintf(workBuf, "result %s\n", result);
