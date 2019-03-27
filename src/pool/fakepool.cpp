@@ -44,17 +44,20 @@ int HexDigit(char c)
     assert(false);
 }
 
-void SendStr(int conn, const char *buf)
+bool SendStr(int conn, const char *buf)
 {
     int status;
     size_t len = strlen(buf);
     while (len)
     {
         status = send(conn, buf, len, 0);
+        if (status == -1)
+            return false;
         assert(status > 0);
         len -= status;
         buf += status;
     }
+    return true;
 }
 
 bool HashLess(const uint8_t hash1[32], const uint8_t hash2[32])
@@ -95,11 +98,77 @@ void FromHex(uint8_t (&binStr)[bytes], const char hexStr[])
     }
 }
 
+uint64_t time_ms()
+{
+    timespec tm;
+    clock_gettime(CLOCK_MONOTONIC, &tm);
+    return tm.tv_sec*1000ULL + tm.tv_nsec / 1000000;
+}
+
+struct SocketLineReader
+{
+    SocketLineReader(int fd): fd(fd), closed(false) {}
+
+    std::string ReadLine(int timeout_ms)
+    {
+        size_t pos = 0;
+        while (true)
+        {
+            pos = buffer.find('\n', pos);
+            if (pos != std::string::npos)
+            {
+                std::string res = buffer.substr(0, pos);
+                buffer.erase(0, pos+1);
+                return res;
+            }
+            pos = buffer.size();
+
+            char buf[200];
+            int status = recv(fd, buf, sizeof buf, MSG_DONTWAIT);
+            if (status > 0)
+            {
+                buffer.append(buf, status);
+                continue;
+            }
+            if (status == 0)
+            {
+                closed = true;
+                return "";
+            }
+            if (errno != EAGAIN && errno != EWOULDBLOCK)
+            {
+                perror("recv failed");
+                closed = true;
+                return "";
+            }
+            if (timeout_ms <= 0)
+            {
+                return "";
+            }
+
+            uint64_t started = time_ms();
+            struct pollfd pfd;
+            pfd.fd = fd;
+            pfd.events = POLLIN;
+            if (!poll(&pfd, 1, timeout_ms))
+                return "";
+            uint64_t elapsed = time_ms() - started;
+            timeout_ms -= elapsed;
+        }
+    }
+
+    int fd;
+    std::string buffer;
+    bool closed;
+};
+
+
 void FakePool(int conn, int epochLength)
 {
     uint8_t header[80];
     uint8_t target[32];
     uint32_t key;
+    SocketLineReader sock(conn);
 
     while (true)
     {
@@ -114,26 +183,19 @@ void FakePool(int conn, int epochLength)
         ToHex(target, targetHex, true);
         char workBuf[256];
         sprintf(workBuf, "work %s %s %d\n", headerHex, targetHex, key);
-        SendStr(conn, workBuf);
-
-        struct pollfd pfd;
-        pfd.fd = conn;
-        pfd.events = POLLIN;
-        int timeout = rand() % 10000;
-        int ready = poll(&pfd, 1, timeout);
-        if (pfd.revents & (POLLERR | POLLHUP))
+        if (!SendStr(conn, workBuf))
             break;
-        if (ready > 0 && (pfd.revents & POLLIN))
+
+        int timeout = rand() % 10000;
+        std::string command = sock.ReadLine(timeout);
+        if (sock.closed)
+            break;
+        if (command.size())
         {
-            char submitBuf[180];
-            int received = recv(conn, submitBuf, sizeof submitBuf - 1, 0);
-            if (received <= 0)
-                break;
-            submitBuf[received] = 0;
-            if (received >= 167 && memcmp(submitBuf, "submit ", 7) == 0)
+            if (command.size() >= 167 && command.substr(0, 7) == "submit ")
             {
                 uint8_t solvedHeader[80];
-                FromHex(solvedHeader, submitBuf+7);
+                FromHex(solvedHeader, command.c_str()+7);
                 const char* result;
                 if (memcmp(solvedHeader, header, 76) != 0)
                 {
@@ -161,11 +223,12 @@ void FakePool(int conn, int epochLength)
                     }
                 }
                 sprintf(workBuf, "result %s\n", result);
-                SendStr(conn, workBuf);
+                if (!SendStr(conn, workBuf))
+                    break;
             }
             else
             {
-                fprintf(stderr, "Unknown command: %s\n", submitBuf);
+                fprintf(stderr, "Unknown command: %s\n", command.c_str());
             }
         }
     }
@@ -229,13 +292,6 @@ int main(int argc, const char* argv[])
             perror("accept failed");
             return 1;
         }
-        int flags = fcntl(status, F_GETFL, 0);
-        if (flags == -1)
-        {
-            perror("fcntl failed");
-            return 1;
-        }
-        fcntl(status, F_SETFL, flags | O_NONBLOCK);
         std::thread(FakePool, status, epochLength).detach();
     }
 }
