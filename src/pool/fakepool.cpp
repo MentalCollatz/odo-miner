@@ -150,6 +150,25 @@ void FakePool(int conn, int epochLength)
                     else
                     {
                         bool found = false;
+                        for (int i = 0; i < 32 && !found; i++)
+                        {
+                            for (int j = 0; j <= i; j++)
+                            {
+                                for (int k = j; k <= i; k++)
+                                    solvedHeader[76+(k/8)] ^= 1 << (k%8);
+                                uint8_t hash2[32];
+                                HashOdo(hash2, solvedHeader, solvedHeader+80, key);
+                                if (!HashLess(target, hash2))
+                                {
+                                    fprintf(stderr, "bits flipped %d-%d\n", j, i);
+                                    found = true;
+                                    result = "corrupted";
+                                    break;
+                                }
+                                for (int k = j; k <= i; k++)
+                                    solvedHeader[76+(k/8)] ^= 1 << (k%8);
+                            }
+                        }
                         for (int pos = 76; pos < 80 && !found; pos++)
                         {
                             for (int i = 1; i < 256; i++)
