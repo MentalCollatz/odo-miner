@@ -44,9 +44,9 @@ proc crc_setup {} {
 
 proc crc_message {padded cksum recoverable} {
     if {$recoverable} {
-        post_message -type warning "Recoverable checkcksum failure: $padded -> $cksum"
+        status_print -type warning "Recoverable checkcksum failure: $padded -> $cksum"
     } else {
-        post_message -type error "Unrecoverable checkcksum failure: $padded -> $cksum"
+        status_print -type error "Unrecoverable checkcksum failure: $padded -> $cksum"
     }
 }
 

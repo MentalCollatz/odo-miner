@@ -24,17 +24,17 @@ source checksum.tcl
 
 # Program the FPGA with the specified .sof file
 proc program_fpga {hardware_name sof_name chain_pos} {
-    post_message -type info "Programming $hardware_name with $sof_name"
+    status_print -type info "Programming $hardware_name with $sof_name"
 
     # cancel any existing sources and probes
     catch end_insystem_source_probe
 
     if {[catch {exec quartus_pgm -c $hardware_name -m JTAG -o "P;$sof_name@$chain_pos"} result]} {
-        post_message -type error "Programming failed:"
+        status_print -type error "Programming failed:"
         puts $result
         return 0
     } else {
-        post_message -type info "Programming successful."
+        status_print -type info "Programming successful."
         return 1
     }
 }
@@ -210,7 +210,7 @@ proc instance_exists {name} {
 # Try to find an FPGA on the JTAG chain that has mining firmware loaded into it.
 proc find_miner_fpga {hardware_name} {
     if {[catch {get_device_names -hardware_name $hardware_name} device_names]} {
-        post_message -type error "get_device_names: $device_names"
+        status_print -type error "get_device_names: $device_names"
         return
     }
 
