@@ -37,7 +37,7 @@ proc advance_epoch {seed} {
     global project_config
     if {$seed == 0} {
         if {$seed != $last_warning} {
-            post_message -type warning "Pool is unable to provide work."
+            status_print -type warning "Pool is unable to provide work."
             set last_warning $seed
         }
         return 0
@@ -53,7 +53,7 @@ proc advance_epoch {seed} {
     set sof [get_sof_name [lindex $project_config 0] $seed]
     if {![file exists $sof]} {
         if {$seed != $last_warning} {
-            post_message -type warning "File $sof does not exist, unable to mine."
+            status_print -type warning "File $sof does not exist, unable to mine."
             post_message -type warning "Please ensure autocompile.sh is running."
             set last_warning $seed
         }
@@ -79,7 +79,7 @@ proc set_work {data target seed} {
     set_work_target $target
     push_work_to_fpga $data
     if {$last_warning == 0} {
-        post_message -type info "Received work from pool."
+        status_print -type info "Received work from pool."
         set last_warning ""
     }
 }
@@ -87,6 +87,7 @@ proc set_work {data target seed} {
 proc add_result {status} {
     global epoch_results
     dict incr epoch_results $status
+    set count [dict get $epoch_results $status]
     if {$status eq "accepted"} {
         set type info
     } elseif {$status eq "stale" || $status eq "inconclusive"} {
@@ -94,14 +95,26 @@ proc add_result {status} {
     } else {
         set type error
     }
-    post_message -type $type "result $status"
+    if {$count <= 10} {
+        status_print -type $type "result $status"
+    } elseif {$count <= 100 && ($count % 10) == 0} {
+        status_print -type $type "result (x10) $status"
+    } elseif {($count % 100) == 0} {
+        status_print -type $type "result (x100) $status"
+    }
+    if {$count == 10} {
+        post_message -type $type "Future $status results will be batched in 10s"
+    }
+    if {$count == 100} {
+        post_message -type $type "Future $status results will be batched in 100s"
+    }
 }
 
 proc receive_data {conn} {
     fconfigure $conn -blocking 1
     gets $conn data
     if {$data eq ""} {
-        post_message -type error "Lost connection to pool"
+        status_print -type error "Lost connection to pool"
         qexit -error
     }
     set args [split $data]
@@ -114,7 +127,7 @@ proc receive_data {conn} {
     } elseif {$command eq "result" && [llength $args] == 1} {
         add_result {*}$args
     } else {
-        post_message -type warning "Unknown command: $command $args"
+        status_print -type warning "Unknown command: $command $args"
     }
     fconfigure $conn -blocking 0
 }

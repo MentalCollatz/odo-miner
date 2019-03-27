@@ -13,17 +13,28 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# Current local time in iso8601 format
+proc now {} {
+    return [clock format [clock seconds] -format "%Y-%m-%d %T"]
+}
+
+proc status_print {args} {
+    set last [lindex $args end]
+    set rest [lrange $args 0 end-1]
+    post_message {*}$rest "\[[now]\] $last"
+}
+
 proc keep_trying {attempts command args} {
     while {1} {
         if {[catch {$command {*}$args} res]} {
             set res [string trim $res]
-            post_message -type warning "Command `$command $args` failed:"
+            status_print -type warning "Command `$command $args` failed:"
             puts $res
             incr attempts -1
             if {$attempts > 0} {
                 after 1
             } else {
-                post_message -type error "Too many failures, aborting"
+                status_print -type error "Too many failures, aborting"
                 qexit -error
             }
         } else {
