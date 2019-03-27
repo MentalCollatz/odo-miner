@@ -110,6 +110,20 @@ module miner(clk, header, target, nonce);
     end
 endmodule
 
+module pad_nonce(clk, in, out);
+    input clk;
+    input [31:0] in;
+    output reg [43:0] out;
+
+    wire [11:0] checksum;
+    crc12 cksum(in, checksum);
+
+    always @(posedge clk)
+    begin
+        out <= { checksum, in };
+    end
+endmodule
+
 module miner_top(osc_clk);
     input osc_clk;
     
@@ -125,7 +139,8 @@ module miner_top(osc_clk);
     source #(256, "TRGT") src3(target);
     
     wire [31:0] nonce;
-    probe #(32, "GNON") probe_nonce(nonce);
+    wire [43:0] padded_nonce;
+    probe #(44, "GNON") probe_nonce(padded_nonce);
     
     wire [31:0] seed = `ODOKEY;
     probe #(32, "SEED") probe_seed(seed);
@@ -134,5 +149,6 @@ module miner_top(osc_clk);
     pll main_pll(osc_clk, miner_clk);
 
     miner(miner_clk, header, target, nonce);
+    pad_nonce(miner_clk, nonce, padded_nonce);
 endmodule
     

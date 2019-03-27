@@ -16,6 +16,7 @@
 
 source utils.tcl
 source projects.tcl
+source checksum.tcl
 
 # User API Functions
 # These should be generic and be the same no matter what the underlying FPGA is.
@@ -85,11 +86,17 @@ proc get_result_from_fpga {} {
         return
     }
 
-    set golden_nonce [reverse_hex [read_instance GNON]]
+    set golden_nonce [read_instance GNON]
 
     if {$golden_nonce ne $fpga_last_nonce} {
         set fpga_last_nonce $golden_nonce
-        return $fpga_current_work$golden_nonce
+        # see if it's padded with a checksum
+        if {[string length $golden_nonce] != 8} {
+            set golden_nonce [expr 0x$golden_nonce]
+            set golden_nonce [crc_check $golden_nonce]
+            set golden_nonce [format %08x $golden_nonce]
+        }
+        return $fpga_current_work[reverse_hex $golden_nonce]
     }
 }
 
