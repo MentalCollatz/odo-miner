@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from base58 import b58decode
+from base58 import b58decode_check
 from binascii import hexlify, unhexlify
 from hashlib import sha256
 from segwit_addr import decode as segwit_decode
@@ -126,8 +126,9 @@ class Script:
             return Script().push_int(witver).push_bytes(witprog)
 
         # legacy address
-        addrbin = b58decode(addr)
-        if addrbin is None:
+        try:
+            addrbin = b58decode_check(addr)
+        except ValueError as e:
             return None
         addr_prefix = byte_ord(addrbin[0])
         addrbin = addrbin[1:]
@@ -137,7 +138,7 @@ class Script:
             return Script()\
                 .push_byte(self.OP_DUP)\
                 .push_byte(self.OP_HASH160)\
-                .push_str(addrbin[:20])\
+                .push_str(addrbin)\
                 .push_byte(self.OP_EQUALVERIFY)\
                 .push_byte(self.OP_CHECKSIG)
 
@@ -145,7 +146,7 @@ class Script:
         if addr_prefix == prefix_script:
             return Script()\
                 .push_byte(self.OP_HASH160)\
-                .push_str(addrbin[:20])\
+                .push_str(addrbin)\
                 .push_byte(self.OP_EQUAL)
 
         return None
