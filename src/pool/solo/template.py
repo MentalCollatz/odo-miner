@@ -137,7 +137,7 @@ class Script:
             return Script()\
                 .push_byte(self.OP_DUP)\
                 .push_byte(self.OP_HASH160)\
-                .push_str(addrbin[1:])\
+                .push_str(addrbin[1:21])\
                 .push_byte(self.OP_EQUALVERIFY)\
                 .push_byte(self.OP_CHECKSIG)
 
@@ -145,7 +145,7 @@ class Script:
         if addr_prefix == prefix_script:
             return Script()\
                 .push_byte(self.OP_HASH160)\
-                .push_str(addrbin[1:])\
+                .push_str(addrbin[1:21])\
                 .push_byte(self.OP_EQUAL)
 
         return None
