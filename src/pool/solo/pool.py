@@ -91,9 +91,7 @@ class Miner(threading.Thread):
         self.manager = manager
         self.lock = threading.Lock()
         self.conn_lock = threading.Lock()
-        self.template = None
-        self.extra_nonce = None
-        self.work = None
+        self.work_items = []
         self.next_refresh = 0
         self.refresh_interval = 10
         manager.add_miner(self)
@@ -101,15 +99,17 @@ class Miner(threading.Thread):
 
     def push_work(self, template, extra_nonce):
         if template is None:
-            work = None
             workstr = "work %s %s %d" % ("0"*64, "0"*64, 0)
         else:
             work = template.get_work(extra_nonce)
             workstr = "work %s %s %d" % (work, template.target, template.odo_key)
         with self.lock:
-            self.template = template
-            self.extra_nonce = extra_nonce
-            self.work = work
+            if template is None:
+                self.work_items = []
+            else:
+                self.work_items.insert(0, (work, template, extra_nonce))
+                if len(self.work_items) > 2:
+                    self.work_items.pop()
             self.next_refresh = time.time() + self.refresh_interval
         try:
             self.send(workstr)
@@ -123,9 +123,14 @@ class Miner(threading.Thread):
 
     def submit(self, work):
         with self.lock:
-            if work is None or work[0:152] != self.work[0:152]:
+            for work_item in self.work_items:
+                if work_item[0][0:152] == work[0:152]:
+                    template = work_item[1]
+                    extra_nonce = work_item[2]
+                    submit_data = work + template.get_data(extra_nonce)
+                    break
+            else:
                 return "stale"
-            submit_data = work + self.template.get_data(self.extra_nonce)
         try:
             return rpc.submit_work(submit_data)
         except (rpc.RpcError, socket.error) as e:
