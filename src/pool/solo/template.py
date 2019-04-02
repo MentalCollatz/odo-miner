@@ -132,6 +132,8 @@ class Script:
             return None
         addr_prefix = byte_ord(addrbin[0])
         addrbin = addrbin[1:]
+        if len(addrbin) != 20:
+            return None
 
         # pubkey hash
         if addr_prefix == prefix_pubkey:
