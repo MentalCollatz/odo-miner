@@ -232,26 +232,29 @@ void OdoVerilog::Generate(int throughput, const char* prefix, FILE* f) const
     fprintf(f, "endmodule\n\n");
 
     // get round key
-    for (int i = 0; i < unrolling; i++)
+    if (throughput != 1)
     {
-        fprintf(f, "module %sget_round_key%d(clk, period, key);\n", prefix, i);
-        fprintf(f, "    input clk;\n");
-        fprintf(f, "    input [%d:0] period;\n", period_bits-1);
-        fprintf(f, "    output [%d:0] key;\n", STATE_SIZE-1);
-        fprintf(f, "    reg [%d:0] key;\n", STATE_SIZE-1);
-        fprintf(f, "    always @(posedge clk) begin\n");
-        fprintf(f, "    case (period)\n");
-        for (int j = 0, r = i; r < ROUNDS; j++, r += unrolling)
+        for (int i = 0; i < unrolling; i++)
         {
-            fprintf(f, "        %d'h%0*x: key <= %d'h%0*x;\n",
-                NIBBLES(period_bits), j,
-                NIBBLES(STATE_SIZE), RoundKey[r]);
+            fprintf(f, "module %sget_round_key%d(clk, period, key);\n", prefix, i);
+            fprintf(f, "    input clk;\n");
+            fprintf(f, "    input [%d:0] period;\n", period_bits-1);
+            fprintf(f, "    output [%d:0] key;\n", STATE_SIZE-1);
+            fprintf(f, "    reg [%d:0] key;\n", STATE_SIZE-1);
+            fprintf(f, "    always @(posedge clk) begin\n");
+            fprintf(f, "    case (period)\n");
+            for (int j = 0, r = i; r < ROUNDS; j++, r += unrolling)
+            {
+                fprintf(f, "        %d'h%0*x: key <= %d'h%0*x;\n",
+                    NIBBLES(period_bits), j,
+                    NIBBLES(STATE_SIZE), RoundKey[r]);
+            }
+            fprintf(f, "    endcase\n");
+            fprintf(f, "    end\n");
+            fprintf(f, "endmodule\n\n");
         }
-        fprintf(f, "    endcase\n");
-        fprintf(f, "    end\n");
-        fprintf(f, "endmodule\n\n");
     }
-    
+
     // encrypt loop
     fprintf(f, "module %sencrypt_loop(clk, in, read, out, write);\n", prefix);
     fprintf(f, "    input clk;\n");
@@ -259,34 +262,49 @@ void OdoVerilog::Generate(int throughput, const char* prefix, FILE* f) const
     fprintf(f, "    input read;\n");
     fprintf(f, "    output reg [%d:0] out;\n", DIGEST_BITS-1);
     fprintf(f, "    output write;\n");
-    fprintf(f, "    wire [%d:0] roundkey[%d:0];\n", STATE_SIZE-1, unrolling-1);
-    fprintf(f, "    reg [%d:0] period[%d:0];\n", period_bits-1, 2*unrolling+extra_delay-1);
     fprintf(f, "    reg [%d:0] state[%d:0];\n", DIGEST_BITS-1, unrolling+extra_delay-1);
     fprintf(f, "    wire [%d:0] next[%d:0];\n", DIGEST_BITS-1, unrolling+extra_delay-1);
     for (int i = 1; i < unrolling+extra_delay; i++)
         fprintf(f, "    always @(posedge clk) state[%d] <= next[%d];\n", i, i-1);
-    for (int i = 1; i < 2*unrolling+extra_delay; i++)
-        fprintf(f, "    always @(posedge clk) period[%d] <= period[%d];\n", i, i-1);
-    for (int i = 0; i < unrolling; i++)
-    {
-        fprintf(f, "    %sget_round_key%d get_key%d(clk, period[%d], roundkey[%d]);\n", prefix, i, i, 2*i, i);
-        fprintf(f, "    %sfull_round round%d(clk, roundkey[%d], state[%d], next[%d]);\n", prefix, i, i, i, i);
-    }
     for (int i = 0; i < extra_delay; i++)
         fprintf(f, "    assign next[%d] = state[%d];\n", i+unrolling, i+unrolling);
-    fprintf(f, "    always @(posedge clk) begin\n");
-    fprintf(f, "        if (read)\n");
-    fprintf(f, "        begin\n");
-    fprintf(f, "            period[0] <= 0;\n");
-    fprintf(f, "            state[0] <= in;\n");
-    fprintf(f, "        end\n");
-    fprintf(f, "        else\n");
-    fprintf(f, "        begin\n");
-    fprintf(f, "            period[0] <= period[%d]+1;\n", 2*unrolling+extra_delay-1);
-    fprintf(f, "            state[0] <= next[%d];\n", unrolling+extra_delay-1);
-    fprintf(f, "        end\n");
-    fprintf(f, "        out <= next[%d];\n", (ROUNDS-1) % unrolling);
-    fprintf(f, "    end\n");
+    if (throughput != 1)
+    {
+        fprintf(f, "    wire [%d:0] roundkey[%d:0];\n", STATE_SIZE-1, unrolling-1);
+        fprintf(f, "    reg [%d:0] period[%d:0];\n", period_bits-1, 2*unrolling+extra_delay-1);
+        for (int i = 1; i < 2*unrolling+extra_delay; i++)
+            fprintf(f, "    always @(posedge clk) period[%d] <= period[%d];\n", i, i-1);
+        for (int i = 0; i < unrolling; i++)
+        {
+            fprintf(f, "    %sget_round_key%d get_key%d(clk, period[%d], roundkey[%d]);\n", prefix, i, i, 2*i, i);
+            fprintf(f, "    %sfull_round round%d(clk, roundkey[%d], state[%d], next[%d]);\n", prefix, i, i, i, i);
+        }
+        fprintf(f, "    always @(posedge clk) begin\n");
+        fprintf(f, "        if (read)\n");
+        fprintf(f, "        begin\n");
+        fprintf(f, "            period[0] <= 0;\n");
+        fprintf(f, "            state[0] <= in;\n");
+        fprintf(f, "        end\n");
+        fprintf(f, "        else\n");
+        fprintf(f, "        begin\n");
+        fprintf(f, "            period[0] <= period[%d]+1;\n", 2*unrolling+extra_delay-1);
+        fprintf(f, "            state[0] <= next[%d];\n", unrolling+extra_delay-1);
+        fprintf(f, "        end\n");
+        fprintf(f, "        out <= next[%d];\n", (ROUNDS-1) % unrolling);
+        fprintf(f, "    end\n");
+    }
+    else
+    {
+        for (int i = 0; i < unrolling; i++)
+        {
+            fprintf(f, "    %sfull_round round%d(clk, %d'h%0*x, state[%d], next[%d]);\n",
+                    prefix, i, NIBBLES(STATE_SIZE), RoundKey[i], i, i);
+        }
+        fprintf(f, "    always @(posedge clk) begin\n");
+        fprintf(f, "        state[0] <= in;\n");
+        fprintf(f, "        out <= next[%d];\n", ROUNDS-1);
+        fprintf(f, "    end\n");
+    }
     fprintf(f, "    reg [%d:0] progress;\n", latency-1);
     fprintf(f, "    initial progress = %d'h0;\n", latency);
     fprintf(f, "    always @(posedge clk) progress[0] <= read;\n");

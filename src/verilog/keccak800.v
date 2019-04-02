@@ -247,7 +247,7 @@ module keccak_hasher(clk, in, read, out, write);
 
     always @(posedge clk)
     begin
-        if (read)
+        if (THROUGHPUT == 1 || read)
             state[0] <= padded;
         else
             state[0] <= next[UNROLLING+EXTRA_DELAY-1];

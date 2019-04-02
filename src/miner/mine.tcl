@@ -133,8 +133,10 @@ proc receive_data {conn} {
 }
 
 proc submit_work {conn work} {
+    fconfigure $conn -blocking 1
     puts $conn "submit $work"
     flush $conn
+    fconfigure $conn -blocking 0
 }
 
 # Allow user to specify hardware via command line. Otherwise provide a list
