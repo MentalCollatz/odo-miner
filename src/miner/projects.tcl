@@ -16,6 +16,7 @@
 set known_projects [list \
     [list cyclone_v_gx_starter_kit 1 USB-Blaster 0x02B020DD] \
     [list de10_nano 2 DE-SoC 0x4BA00477 0x02D020DD] \
+    [list arria_v_gx_starter_kit 1 USB-BlasterII 0x02A030DD 0x020A40DD] \
 ]
 
 # Extract the parenthesized hex code from a device name
