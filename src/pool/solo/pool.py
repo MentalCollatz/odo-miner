@@ -29,6 +29,9 @@ def get_templates(callback):
     while True:
         try:
             template = rpc.get_block_template(longpollid)
+            if "coinbaseaux" not in template:
+                template["coinbaseaux"] = {}
+            template["coinbaseaux"]["cbstring"] = config.get("cbstring")
             callback(template)
             longpollid = template["longpollid"]
             if last_errno != 0:

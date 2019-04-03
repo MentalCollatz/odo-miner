@@ -56,6 +56,7 @@ def init(argv):
     parser.add_argument("-a", "--auth", help="rpc authorization file", type=argparse.FileType("r"))
     parser.add_argument("-l", "--listen", help="port to listen for miners on", dest="listen_port", default=DEFAULT_LISTEN_PORT, type=int)
     parser.add_argument("-r", "--remote", help="allow remote miners to connect", action="store_true")
+    parser.add_argument("--coinbase", help="coinbase string", type=str, default="/odo-miner-solo/")
     parser.add_argument("address", help="address to mine to", type=str)
     args = parser.parse_args(argv[1:])
 
@@ -75,6 +76,7 @@ def init(argv):
         else:
             parser.error("invalid address")
     params["cbscript"] = cbscript.data
+    params["cbstring"] = args.coinbase
     
     if args.user and args.password:
         if args.auth:

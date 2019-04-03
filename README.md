@@ -20,6 +20,14 @@ your installation.  For example ``export QUARTUSPATH="/home/miner/altera/18.1/qu
 This line should be added to your ``~/.profile`` file or another file that is sourced whenever a
 shell is launched.  Don't forget to source the file after editing it.
 
+Solo Mining
+-----------
+
+Install and start a full node via <https://github.com/digibyte/digibyte>.
+
+* A python interpreter is required and pip is recommended - ``apt install python python-pip`` (Python 3 should also work, but most testing has been done in Python 2).
+* Python modules base58 and requests - ``pip install base58 requests``
+
 Additional Files
 ----------------
 
@@ -44,7 +52,8 @@ Starting to Mine
 
 This will require multiple terminal windows.  A screen multiplexer such as [tmux](https://github.com/tmux/tmux/wiki) or [screen](https://www.gnu.org/software/screen/) may make things easier for you.
 
+* Ensure your DigiByte node is running.  It is recommended that you do not specify an rpcpassword in digibyte.conf.  The rpcuser and rpcpassword options will soon be deprecated.
 * In one terminal, go to the ``src`` directory and run ``./autocompile.sh --testnet cyclone_v_gx_starter_kit de10_nano``
-* In another terminal, go to the ``src/pool`` directory and run ``make fakepool`` followed by ``./fakepool --testnet``
-* Finally, for each mining fpga open a terminal in the ``src/miner`` directory and run ``$QUARTUSPATH/quartus_stp -t mine.tcl``
+* In another terminal, go to the ``src/pool/solo`` directory and run ``python pool.py --testnet <dgb_address>``
+* Finally, for each mining fpga open a terminal in the ``src/miner`` directory and run ``$QUARTUSPATH/quartus_stp -t mine.tcl [hardware_name]``.  The ``hardware_name`` argument is optional, and if not specified the script will prompt you to select one of the detected mining devices.
 
