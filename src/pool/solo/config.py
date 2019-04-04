@@ -24,7 +24,8 @@ from template import Script
 DEFAULT_LISTEN_PORT = 17064
 
 MAINNET_RPC_PORT = 14022
-TESTNET_RPC_PORT = 18332
+TESTNET_RPC_PORT = 14023
+TESTNET_CHAIN_NAME = "testnet4"
 
 MAINNET_ADDR_FORMAT = {"bech32_hrp": "dgb", "prefix_pubkey": 30, "prefix_script": 63 }
 TESTNET_ADDR_FORMAT = {"bech32_hrp": "dgbt", "prefix_pubkey": 126, "prefix_script": 140 }
@@ -91,7 +92,7 @@ def init(argv):
     else:
         cookie = data_dir()
         if args.testnet:
-            cookie = os.path.join(cookie, "testnet3")
+            cookie = os.path.join(cookie, TESTNET_CHAIN_NAME)
         cookie = os.path.join(cookie, ".cookie")
         try:
             with open(cookie, "r") as f:
