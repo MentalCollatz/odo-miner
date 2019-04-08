@@ -55,5 +55,5 @@ This will require multiple terminal windows.  A screen multiplexer such as [tmux
 * Ensure your DigiByte node is running.  It is recommended that you do not specify an rpcpassword in digibyte.conf.  The rpcuser and rpcpassword options will soon be deprecated.
 * In one terminal, go to the ``src`` directory and run ``./autocompile.sh --testnet cyclone_v_gx_starter_kit de10_nano``
 * In another terminal, go to the ``src/pool/solo`` directory and run ``python pool.py --testnet <dgb_address>``
-* Finally, for each mining fpga open a terminal in the ``src/miner`` directory and run ``$QUARTUSPATH/quartus_stp -t mine.tcl [hardware_name]``.  The ``hardware_name`` argument is optional, and if not specified the script will prompt you to select one of the detected mining devices.
+* Finally, for each mining fpga open a terminal in the ``src/miner`` directory and run ``$QUARTUSPATH/quartus_stp -t mine.tcl [hardware_name]``.  The ``hardware_name`` argument is optional, and if not specified the script will prompt you to select one of the detected mining devices.  If you're comfortable using [screen](https://www.gnu.org/software/screen/), you can run ``src/miner/mine_in_screen.sh`` instead to start a screen session with one window per mining device.
 
