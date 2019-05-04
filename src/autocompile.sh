@@ -41,6 +41,7 @@ then
     exit 1
 fi
 
+UPTODATE=0
 while true
 do
     NOW=$( date +%s )
@@ -58,12 +59,18 @@ do
             then
                 continue
             fi
+            UPTODATE=0
             ./compile.sh $PROJECT $SEED
             # We might have advanced to the next epoch by now.
             break 2
         done
         if [ $SEED -eq $NEXT_SEED ]
         then
+            if [ $UPTODATE -eq 0 ]
+            then
+                echo "Up to date"
+                UPTODATE=1
+            fi
             # Nothing to do. Sleep for a while.
             sleep 60
         fi
