@@ -37,6 +37,17 @@ else
     JTAGCONFIG="$QUARTUSPATH/jtagconfig"
 fi
 
+# make sure screen is installed
+if ! hash screen 2>/dev/null
+then
+    echo "You must install 'screen' before using this script" >&2
+    if hash command_not_found_handle 2>/dev/null
+    then
+        command_not_found_handle screen
+    fi
+    exit 1
+fi
+
 SCREEN=miners
 if [ $# -eq 1 ]
 then
