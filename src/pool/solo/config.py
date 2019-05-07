@@ -23,12 +23,20 @@ from template import Script
 
 DEFAULT_LISTEN_PORT = 17064
 
-MAINNET_RPC_PORT = 14022
-TESTNET_RPC_PORT = 14023
-TESTNET_CHAIN_NAME = "testnet4"
-
-MAINNET_ADDR_FORMAT = {"bech32_hrp": "dgb", "prefix_pubkey": 30, "prefix_script": 63 }
-TESTNET_ADDR_FORMAT = {"bech32_hrp": "dgbt", "prefix_pubkey": 126, "prefix_script": 140 }
+CHAIN_PARAMS = [
+    {
+        "name": "main",
+        "rpc_port": 14022,
+        "addr_format": {"bech32_hrp": "dgb", "prefix_pubkey": 30, "prefix_script": 63 },
+        "donation_addr": "DCo11atzQBsymnLEouhTn3CVxyL3zGbFBC",
+    },
+    {
+        "name": "testnet4",
+        "rpc_port": 14023,
+        "addr_format": {"bech32_hrp": "dgbt", "prefix_pubkey": 126, "prefix_script": 140 },
+        "donation_addr": "dgbt1qtm6z2cw2tm2pj0jrj79v87hjfz2ylc2xsk274a",
+    },
+]
 
 def data_dir():
     if platform.system() == "Windows":
@@ -58,17 +66,18 @@ def init(argv):
     parser.add_argument("-l", "--listen", help="port to listen for miners on", dest="listen_port", default=DEFAULT_LISTEN_PORT, type=int)
     parser.add_argument("-r", "--remote", help="allow remote miners to connect", action="store_true")
     parser.add_argument("--coinbase", help="coinbase string", type=str, default="/odo-miner-solo/")
+    parser.add_argument("-d", "--donate", help="donation percentage", type=float, default=2.0)
     parser.add_argument("address", help="address to mine to", type=str)
     args = parser.parse_args(argv[1:])
 
     global params
     params = {key: getattr(args, key) for key in ["rpc_host", "listen_port", "testnet"]}
     
-    addr_format = TESTNET_ADDR_FORMAT if args.testnet else MAINNET_ADDR_FORMAT
-    cbscript = Script.from_address(args.address, **addr_format)
+    chain = CHAIN_PARAMS[args.testnet]
+    cbscript = Script.from_address(args.address, **chain["addr_format"])
     if cbscript is None:
-        other_addr_format = MAINNET_ADDR_FORMAT if args.testnet else TESTNET_ADDR_FORMAT
-        cbscript = Script.from_address(args.address, **other_addr_format)
+        other_chain = CHAIN_PARAMS[not args.testnet]
+        cbscript = Script.from_address(args.address, **other_chain["addr_format"])
         if cbscript is not None:
             if args.testnet:
                 parser.error("mainnet address specified with --testnet")
@@ -76,7 +85,10 @@ def init(argv):
                 parser.error("testnet address specified without --testnet")
         else:
             parser.error("invalid address")
-    params["cbscript"] = cbscript.data
+    params["cbscript"] = [(cbscript.data, None)]
+    if args.donate > 0:
+        donation_script = Script.from_address(chain["donation_addr"], **chain["addr_format"])
+        params["cbscript"].append((donation_script.data, args.donate/100))
     params["cbstring"] = args.coinbase
     
     if args.user and args.password:
@@ -88,11 +100,11 @@ def init(argv):
     elif args.user or args.password:
         parser.error("--user and --password must both be present or neither present")
     elif args.auth:
-        rpc_auth = args.auth.read()
+        rpc_auth = args.auth.read().strip()
     else:
         cookie = data_dir()
         if args.testnet:
-            cookie = os.path.join(cookie, TESTNET_CHAIN_NAME)
+            cookie = os.path.join(cookie, chain["name"])
         cookie = os.path.join(cookie, ".cookie")
         try:
             with open(cookie, "r") as f:
@@ -100,13 +112,13 @@ def init(argv):
                 # restart the pool also
                 rpc_auth = f.read()
         except IOError as e:
-            parser.error("Unable to read default auth file `%s`, please specify auth file or user and password.")
+            parser.error("Unable to read default auth file `%s`, please specify auth file or user and password." % cookie)
     params["rpc_auth"] = "Basic " + b64encode_helper(rpc_auth)
 
     if args.rpc_port:
         rpc_port = args.rpc_port
     else:
-        rpc_port = TESTNET_RPC_PORT if args.testnet else MAINNET_RPC_PORT
+        rpc_port = chain["rpc_port"]
     params["rpc_port"] = rpc_port
     params["rpc_url"] = "http://%s:%d" % (params["rpc_host"], params["rpc_port"])
 

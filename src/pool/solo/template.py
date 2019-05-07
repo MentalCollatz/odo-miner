@@ -78,6 +78,28 @@ def merkle_root(cbhash, branch):
         res = sha256d(res + h)
     return res
 
+# Split the mining reward between multiple parties.  The allotments argument is
+# a list of (script, share) pairs, where "share" is either a float indicating
+# the ratio to be given, or None indicating that it is to receive the remainder.
+# Exactly one script should have None as the share.
+def rewards_for_miners(total, allotments):
+    res = []
+    remaining = total
+    main_script = None
+    for script, share in allotments:
+        if share is not None:
+            portion = min(int(share * total), remaining)
+            if portion > 0:
+                res.append((portion, script))
+                remaining -= portion
+        else:
+            assert main_script is None, "Expect exactly one script with None"
+            main_script = script
+    assert main_script is not None, "Expect exactly one script with None"
+    if remaining > 0:
+        res = [(remaining, main_script)] + res
+    return res
+
 class Script:
     OP_0 = 0x00
     OP_PUSHDATA1 = 0x4c
@@ -156,7 +178,7 @@ class Script:
 class Coinbase:
     def __init__(self, cbscript, template):
         self.height = template["height"]
-        self.txout = [(template["coinbasevalue"], cbscript)]
+        self.txout = rewards_for_miners(template["coinbasevalue"], cbscript)
         self.needs_witness = any(tx["txid"] != tx["hash"] for tx in template["transactions"])
         if self.needs_witness:
             self.txout.append((0, unhexlify(template["default_witness_commitment"])))
