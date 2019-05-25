@@ -17,15 +17,22 @@
 
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 
-EPOCH_LEN=864000
+MAINNET_EPOCH_LEN=864000
+TESTNET_EPOCH_LEN=86400
+
+EPOCH_LEN=$MAINNET_EPOCH_LEN
 ANY=0
 ERROR=0
+CLEAN=1
 
 for PROJECT in "$@"
 do
     if [ "$PROJECT" == "--testnet" ]
     then
-        EPOCH_LEN=86400
+        EPOCH_LEN=$TESTNET_EPOCH_LEN
+    elif [ "$PROJECT" == "--noclean" ]
+    then
+        CLEAN=0
     elif [ -d "projects/$PROJECT" ]
     then
         ANY=1
@@ -37,7 +44,7 @@ done
 
 if [ $ERROR -eq 1 -o $ANY -eq 0 ]
 then
-    echo "usage: $0 [--testnet] <project> [...]" 1>&2
+    echo "usage: $0 [--testnet] [--noclean] <project> [...]" 1>&2
     exit 1
 fi
 
@@ -51,7 +58,7 @@ do
     do
         for PROJECT in "$@"
         do
-            if [ "$PROJECT" == "--testnet" ]
+            if [[ "$PROJECT" == --* ]]
             then
                 continue
             fi
@@ -68,6 +75,31 @@ do
         then
             if [ $UPTODATE -eq 0 ]
             then
+                if [ $CLEAN -eq 1 ]
+                then
+                    # Always delete old files based on mainnet seeds, since
+                    # mainnet needs files for longer than testnet.
+                    MAINNET_SEED=$(( $NOW - $NOW % $MAINNET_EPOCH_LEN ))
+                    for PROJECT in "$@"
+                    do
+                        if [[ "$PROJECT" == --* ]]
+                        then
+                            continue
+                        fi
+                        # delete all build files
+                        rm -rf projects/$PROJECT/build_files/*
+                        # delete output files from old epochs
+                        for FILE in projects/$PROJECT/output_files/miner_*
+                        do
+                            FILENAME=$(basename "$FILE")
+                            EPOCH=${FILENAME//[^0-9]/}
+                            if [ $EPOCH -lt $MAINNET_SEED ]
+                            then
+                                rm "$FILE"
+                            fi
+                        done
+                    done
+                fi
                 echo "Up to date"
                 UPTODATE=1
             fi
