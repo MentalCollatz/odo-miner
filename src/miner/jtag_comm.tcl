@@ -96,7 +96,7 @@ proc get_result_from_fpga {} {
             set golden_nonce [crc_check $golden_nonce]
             set golden_nonce [format %08x $golden_nonce]
         }
-        return $fpga_current_work[reverse_hex $golden_nonce]
+        return $golden_nonce
     }
 }
 

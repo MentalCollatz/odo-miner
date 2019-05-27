@@ -248,3 +248,34 @@ class BlockTemplate:
     def get_data(self, extra_nonce):
         cb = self.coinbase.data(extra_nonce)
         return as_str(hexlify(compact_size(self.tx_count) + cb)) + self.txdata
+
+def swap_order(d, wsz=8, gsz=1 ):
+    return "".join(["".join([m[i:i+gsz] for i in range(wsz-gsz,-gsz,-gsz)]) for m in [d[i:i+wsz] for i in range(0,len(d),wsz)]])
+
+def get_params_header(params, enonce1, nonce2, nonce2len):
+    idstring  = params[0]
+    prevhash  = swap_order(params[1][::-1])
+    coinbase1 = params[2]
+    coinbase2 = params[3]
+    merklearr = params[4]
+    version   = int(params[5], 16)
+    bits      = params[6]
+    curtime   = int(params[7], 16)
+
+    txids = [unhexlify(tx) for tx in merklearr]
+    mbranch = merkle_branch(txids)
+
+    nonce2str = hexlify(serialize_int(nonce2))
+    nonce2hex = '0'* ((nonce2len*2)-len(nonce2str)) + nonce2str
+
+    coinbasehex = coinbase1+enonce1+nonce2hex+coinbase2
+    coinbasetxid = sha256d(unhexlify(coinbasehex))
+
+    data = pack('<I', version)
+    data += unhexlify(prevhash)[::-1]
+    data += merkle_root(coinbasetxid, mbranch)
+    data += pack('<I', curtime)
+    data += unhexlify(bits)[::-1]
+    data += b'\0\0\0\0' # nonce
+
+    return str(hexlify(data))

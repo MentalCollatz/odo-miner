@@ -26,6 +26,10 @@ set epoch_results [dict create accepted 0]
 set last_seed ""
 # most recent seed with missing sof file
 set last_warning ""
+# stratum params
+set stratum_idstring ""
+set stratum_ntime ""
+set stratum_nonce2 ""
 
 # change the epoch, and reprogram the fpga to the new seed
 proc advance_epoch {seed} {
@@ -67,9 +71,17 @@ proc advance_epoch {seed} {
     return 1
 }
 
-proc set_work {data target seed} {
+proc set_work {data target seed idstring ntime nonce2} {
     global last_seed
     global last_warning
+    global stratum_idstring
+    global stratum_ntime
+    global stratum_nonce2
+
+    set stratum_idstring $idstring
+    set stratum_ntime $ntime
+    set stratum_nonce2 $nonce2
+
     if {$seed != $last_seed} {
         if {![advance_epoch $seed]} {
             clear_fpga_work
@@ -111,6 +123,8 @@ proc add_result {status} {
 }
 
 proc receive_data {conn} {
+    global config_user
+    global config_pass
     fconfigure $conn -blocking 1
     gets $conn data
     if {$data eq ""} {
@@ -120,21 +134,57 @@ proc receive_data {conn} {
     set args [split $data]
     set command [lindex $args 0]
     set args [lrange $args 1 end]
-    # work <data> <target> <seed>
-    if {$command eq "work" && [llength $args] == 3} {
+    # work <data> <target> <seed> <idstring> <ntime> <nonce2>
+    if {$command eq "work" && [llength $args] == 6} {
         set_work {*}$args
     # result <status>
     } elseif {$command eq "result" && [llength $args] == 1} {
         add_result {*}$args
+    } elseif {$command eq "set_target"} {
+        # auth after subscribe
+        pool_auth $conn $config_user $config_pass
+    } elseif {$command eq "set_subscribe_params"} {
+        # nothing for now
+    } elseif {$command eq "mining_notify"} {
+        # nothing for now
     } else {
         status_print -type warning "Unknown command: $command $args"
     }
     fconfigure $conn -blocking 0
 }
 
+proc submit_nonce {conn nonce} {
+    global stratum_idstring
+    global stratum_ntime
+    global stratum_nonce2
+
+    fconfigure $conn -blocking 1
+    puts $conn "submit_nonce $nonce $stratum_idstring $stratum_ntime $stratum_nonce2"
+    status_print "submit_nonce $nonce $stratum_idstring $stratum_ntime $stratum_nonce2"
+    flush $conn
+    fconfigure $conn -blocking 0
+}
+
 proc submit_work {conn work} {
     fconfigure $conn -blocking 1
     puts $conn "submit $work"
+    status_print "submit $work"
+    flush $conn
+    fconfigure $conn -blocking 0
+}
+
+proc pool_auth {conn user pass} {
+    fconfigure $conn -blocking 1
+    puts $conn "auth $user $pass"
+    status_print "auth $user $pass"
+    flush $conn
+    fconfigure $conn -blocking 0
+}
+
+proc pool_subscribe {conn} {
+    fconfigure $conn -blocking 1
+    puts $conn "subscribe"
+    status_print "subscribe"
     flush $conn
     fconfigure $conn -blocking 0
 }
@@ -172,7 +222,7 @@ proc wait_for_nonce {conn} {
     while {1} {
         set solved_work [get_result_from_fpga]
         if {$solved_work ne ""} {
-            submit_work $conn $solved_work
+            submit_nonce $conn $solved_work
         }
         # Allow pool connection to process
         update
@@ -186,5 +236,5 @@ choose_hardware $argv
 #    set last_seed [get_fpga_seed]
 #}
 set conn [create_pool_conn $config_host $config_port]
+pool_subscribe $conn
 wait_for_nonce $conn
-
