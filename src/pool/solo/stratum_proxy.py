@@ -59,8 +59,11 @@ class ProxyClientProtocol(protocol.Protocol):
                 data = fromJson(val)
                 if data.has_key('method'):
                     if data.get('method') == 'mining.set_difficulty':
-                        self.cli_diff = int(data.get('params')[0])
-                        modifiedchunk = "set_target 000000000000000 (diff = %d)" % self.cli_diff
+                        self.cli_diff   = int(data.get('params')[0])
+                        if self.cli_diff < 1:    # it should not be happen but anyway
+                            self.cli_diff = 1
+                        self.cli_target = template.difficulty_to_hextarget(self.cli_diff)
+                        modifiedchunk   = "set_target %s diff %d" % (self.cli_target, self.cli_diff)
                     elif data.get('method') == 'mining.notify':
                         self.cli_wbclean = data.get('params')[8]
                         if self.cli_wbclean and extra_nonce > 0:
@@ -71,9 +74,7 @@ class ProxyClientProtocol(protocol.Protocol):
                         p_header = template.get_params_header(data.get('params'), self.cli_enonce1, self.cli_nonce2, self.cli_nonce2len)
                         self.cli_idstring = str(data.get('params')[0])
                         self.cli_time     = str(data.get('params')[7])
-                        self.cli_target   = str(data.get('params')[9])
-                        self.cli_odokey   = int(data.get('params')[10])
-                        self.cli_target   = '00000000ffff0000000000000000000000000000000000000000000000000000'
+                        self.cli_odokey   = int(data.get('odokey'))
                         modifiedchunk = "work %s %s %d %s %s %d" % (p_header, self.cli_target, self.cli_odokey, self.cli_idstring, self.cli_time, self.cli_nonce2)
                     else:
                         modifiedchunk = val   # send unmodified content
@@ -132,7 +133,8 @@ class ProxyServer(protocol.Protocol):
         match_obj = re.match(r'auth\s(\w+)\s(\w+)', chunk)
         params = match_obj.group(1,2)
         self.cli_authid = match_obj.group(1)
-        modifiedchunk = toJson({'id':1, 'method':'mining.authorize','params':params})
+        modifiedchunk = toJson({'id':self.cli_rpcid, 'method':'mining.authorize','params':params})
+        self.cli_rpcid += 1
         self.cli_auth = modifiedchunk
         return modifiedchunk
 
@@ -140,13 +142,15 @@ class ProxyServer(protocol.Protocol):
         log.msg("Server: %d bytes received" % len(chunk))
         try:
             if re.match(r'auth', chunk):
+                self.cli_rpcid = 1
                 modifiedchunk = self.doAuth(chunk)
             elif re.match(r'submit_nonce', chunk):
                 match_obj = re.match(r'submit_nonce\s(\w+)\s(\w+)\s(\w+)\s(\d+)', chunk)
                 nonce2str = hexlify(template.serialize_int(int(match_obj.group(4))))
                 nonce2hex = '0'* (8-len(nonce2str)) + nonce2str
                 params = [self.cli_authid, str(match_obj.group(2)), nonce2hex, str(match_obj.group(3)), str(match_obj.group(1))]
-                modifiedchunk = toJson({'id':0, 'method':'mining.submit','params':params})
+                modifiedchunk = toJson({'id':self.cli_rpcid, 'method':'mining.submit','params':params})
+                self.cli_rpcid += 1
             else:
                 modifiedchunk = chunk   # send unmodified content
             self.cli_queue.put(modifiedchunk+'\n')    # send processed input

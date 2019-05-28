@@ -37,7 +37,6 @@ It will be switched to Mainnet after block 9,100,000.
 * ``src/pool/solo/stratum_proxy.py`` included for stratum-based mining, it should be started instead of ``pool.py``
 * Digibyte address need to be specified at ``src/miner/config.tcl``
 * Run ``python stratum_proxy.py odo.dgb256.online 8883``
-* Target 1(One) is hardcoded for Testnet share submit to make Pool stats working, code will be improved
 
 Additional Files
 ----------------

@@ -279,3 +279,11 @@ def get_params_header(params, enonce1, nonce2, nonce2len):
     data += b'\0\0\0\0' # nonce
 
     return str(hexlify(data))
+
+def difficulty_to_hextarget(difficulty):
+    assert difficulty >= 0
+    if difficulty == 0: return 2**256-1
+    target = min(int((0xffff0000 * 2**(256-64) + 1)/difficulty - 1 + 0.5), 2**256-1)
+    targethex = hex(target).rstrip("L").lstrip("0x")
+    targetstr = '0'* (64 - len(targethex)) + targethex
+    return str(targetstr)
