@@ -135,7 +135,7 @@ proc receive_data {conn} {
     set command [lindex $args 0]
     set args [lrange $args 1 end]
     # work <data> <target> <seed> <idstring> <ntime> <nonce2>
-    if {$command eq "work" && [llength $args] == 6} {
+    if {$command eq "work" && [llength $args] >= 3} {
         set_work {*}$args
     # result <status>
     } elseif {$command eq "result" && [llength $args] == 1} {
@@ -177,14 +177,6 @@ proc pool_auth {conn user pass} {
     fconfigure $conn -blocking 1
     puts $conn "auth $user $pass"
     status_print "auth $user $pass"
-    flush $conn
-    fconfigure $conn -blocking 0
-}
-
-proc pool_subscribe {conn} {
-    fconfigure $conn -blocking 1
-    puts $conn "subscribe"
-    status_print "subscribe"
     flush $conn
     fconfigure $conn -blocking 0
 }
@@ -236,5 +228,4 @@ choose_hardware $argv
 #    set last_seed [get_fpga_seed]
 #}
 set conn [create_pool_conn $config_host $config_port]
-pool_subscribe $conn
 wait_for_nonce $conn

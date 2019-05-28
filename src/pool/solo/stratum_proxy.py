@@ -16,6 +16,7 @@ from twisted.python import log
 from binascii import hexlify, unhexlify
 
 clicounter = 0
+extra_nonce = 0
 
 def toJson(obj):
     return json.dumps(obj).encode("utf-8")
@@ -26,12 +27,14 @@ def fromJson(str):
 class ProxyClientProtocol(protocol.Protocol):
     def connectionMade(self):
         global clicounter
-        log.msg("Client: connected to peer")
         self.client_id = clicounter
         clicounter += 1
-        self.cli_nonce2 = 0
+        log.msg("Client[%d]: connected to peer" % self.client_id)
         self.cli_queue = self.factory.cli_queue
         self.cli_queue.get().addCallback(self.serverDataReceived)
+        # subscribe after connect
+        subscribe = toJson({'id':0, 'method':'mining.subscribe','params':["odominer"]})
+        self.cli_queue.put(subscribe+'\n')
 
     def serverDataReceived(self, chunk):
         if chunk is False:
@@ -47,6 +50,7 @@ class ProxyClientProtocol(protocol.Protocol):
             self.factory.cli_queue.put(chunk)
 
     def dataReceived(self, chunk):
+        global extra_nonce
         log.msg("Client: %d bytes received from peer" % len(chunk))
         curstr = chunk.splitlines()
         disconnectflag = False
@@ -59,10 +63,11 @@ class ProxyClientProtocol(protocol.Protocol):
                         modifiedchunk = "set_target 000000000000000 (diff = %d)" % self.cli_diff
                     elif data.get('method') == 'mining.notify':
                         self.cli_wbclean = data.get('params')[8]
-                        if self.cli_wbclean:
-                            self.cli_nonce2 = random.randint(0,99999999)
+                        if self.cli_wbclean and extra_nonce > 0:
+                            extra_nonce = 0
                         else:
-                            self.cli_nonce2 += 1
+                            extra_nonce += 1
+                        self.cli_nonce2 = extra_nonce
                         p_header = template.get_params_header(data.get('params'), self.cli_enonce1, self.cli_nonce2, self.cli_nonce2len)
                         self.cli_idstring = str(data.get('params')[0])
                         self.cli_time     = str(data.get('params')[7])
@@ -91,7 +96,6 @@ class ProxyClientProtocol(protocol.Protocol):
                 break    # end for loop if any non-JSON line happen
         if disconnectflag:
             log.msg("Client: disconnect because JSON decode error: %s" % chunk)
-            self.factory.continueTrying = False
             self.transport.loseConnection()
 
     def connectionLost(self, why):
@@ -124,16 +128,19 @@ class ProxyServer(protocol.Protocol):
         self.transport.write(chunk)
         self.srv_queue.get().addCallback(self.clientDataReceived)
 
+    def doAuth(self, chunk):
+        match_obj = re.match(r'auth\s(\w+)\s(\w+)', chunk)
+        params = match_obj.group(1,2)
+        self.cli_authid = match_obj.group(1)
+        modifiedchunk = toJson({'id':1, 'method':'mining.authorize','params':params})
+        self.cli_auth = modifiedchunk
+        return modifiedchunk
+
     def dataReceived(self, chunk):
         log.msg("Server: %d bytes received" % len(chunk))
         try:
-            if re.match(r'subscribe', chunk):
-                modifiedchunk = toJson({'id':0, 'method':'mining.subscribe','params':["odominer"]})
-            elif re.match(r'auth', chunk):
-                match_obj = re.match(r'auth\s(\w+)\s(\w+)', chunk)
-                params = match_obj.group(1,2)
-                self.cli_authid = match_obj.group(1)
-                modifiedchunk = toJson({'id':1, 'method':'mining.authorize','params':params})
+            if re.match(r'auth', chunk):
+                modifiedchunk = self.doAuth(chunk)
             elif re.match(r'submit_nonce', chunk):
                 match_obj = re.match(r'submit_nonce\s(\w+)\s(\w+)\s(\w+)\s(\d+)', chunk)
                 nonce2str = hexlify(template.serialize_int(int(match_obj.group(4))))
