@@ -60,6 +60,7 @@ class ProxyClientProtocol(protocol.Protocol):
                 if data.has_key('method'):
                     if data.get('method') == 'mining.set_difficulty':
                         self.cli_diff   = int(data.get('params')[0])
+                        log.msg("diff from stratum = %d" % self.cli_diff)
                         if self.cli_diff < 1:    # it should not be happen but anyway
                             self.cli_diff = 1
                         self.cli_target = template.difficulty_to_hextarget(self.cli_diff)
@@ -167,7 +168,7 @@ if __name__ == "__main__":
     usage = "%prog <stratum tcp host> <stratum tcp port> [options]"
     parser = ArgumentParser(description=usage)
 
-    parser.add_argument("pool_host", metavar="host", help="stratum tcp host")
+    parser.add_argument("pool_host", metavar="stratum_host", help="stratum tcp host")
     parser.add_argument("pool_port", metavar="stratum_port", help="stratum tcp port", type=int, choices=range(1,65535))
 
     arguments = vars(parser.parse_args())

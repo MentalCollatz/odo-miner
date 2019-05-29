@@ -31,12 +31,18 @@ Install and start a full node via <https://github.com/digibyte/digibyte>.
 Stratum Pool Mining
 -------------------
 
-Full node is not required. Odocrypt Solo Pool at Testnet is up and running at <https://dgb256.online/odo/>.
-It will be switched to Mainnet after block 9,100,000.
+Full node is not required.
+
+Odocrypt Solo Pool at Testnet is up and running at <https://dgb256.online/odo/>
+
+Odocrypt PPLNS Pool at Testnet is up and running at <https://odo.dgb256.online/>
+
+It will be switched to Mainnet after block 9,100,000
 
 * ``src/pool/solo/stratum_proxy.py`` included for stratum-based mining, it should be started instead of ``pool.py``
 * Digibyte address need to be specified at ``src/miner/config.tcl``
-* Run ``python stratum_proxy.py odo.dgb256.online 8883``
+* Usage ``python stratum_proxy.py host port``
+* Example for Solo Pool ``python stratum_proxy.py solo.dgb256.online 8883``
 
 Additional Files
 ----------------
