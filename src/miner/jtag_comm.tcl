@@ -17,6 +17,7 @@
 source utils.tcl
 source projects.tcl
 source checksum.tcl
+source config.tcl
 
 # User API Functions
 # These should be generic and be the same no matter what the underlying FPGA is.
@@ -79,6 +80,7 @@ proc clear_fpga_work {} {
 # Get a new result from the FPGA if one is available and format it for submission.
 # If no results are available, returns empty string
 proc get_result_from_fpga {} {
+    global config_mode
     global fpga_last_nonce
     global fpga_current_work
 
@@ -96,7 +98,11 @@ proc get_result_from_fpga {} {
             set golden_nonce [crc_check $golden_nonce]
             set golden_nonce [format %08x $golden_nonce]
         }
-        return $golden_nonce
+        if {$config_mode eq "stratum"} {
+            return $golden_nonce
+        } else {
+            return $fpga_current_work[reverse_hex $golden_nonce]
+        }
     }
 }
 

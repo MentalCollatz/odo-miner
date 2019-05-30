@@ -71,17 +71,9 @@ proc advance_epoch {seed} {
     return 1
 }
 
-proc set_work {data target seed idstring ntime nonce2} {
+proc set_work {data target seed} {
     global last_seed
     global last_warning
-    global stratum_idstring
-    global stratum_ntime
-    global stratum_nonce2
-
-    set stratum_idstring $idstring
-    set stratum_ntime $ntime
-    set stratum_nonce2 $nonce2
-
     if {$seed != $last_seed} {
         if {![advance_epoch $seed]} {
             clear_fpga_work
@@ -94,6 +86,18 @@ proc set_work {data target seed idstring ntime nonce2} {
         status_print -type info "Received work from pool."
         set last_warning ""
     }
+}
+
+proc set_work_stratum {data target seed idstring ntime nonce2} {
+    global stratum_idstring
+    global stratum_ntime
+    global stratum_nonce2
+
+    set stratum_idstring $idstring
+    set stratum_ntime $ntime
+    set stratum_nonce2 $nonce2
+
+    set_work $data $target $seed
 }
 
 proc add_result {status} {
@@ -134,14 +138,17 @@ proc receive_data {conn} {
     set args [split $data]
     set command [lindex $args 0]
     set args [lrange $args 1 end]
-    # work <data> <target> <seed> <idstring> <ntime> <nonce2>
-    if {$command eq "work" && [llength $args] >= 3} {
+    if {$command eq "work" && [llength $args] == 3} {
+        # work <data> <target> <seed>
         set_work {*}$args
+    } elseif {$command eq "work" && [llength $args] == 6} {
+        # work <data> <target> <seed> <idstring> <ntime> <nonce2>
+        set_work_stratum {*}$args
     # result <status>
     } elseif {$command eq "result" && [llength $args] == 1} {
         add_result {*}$args
     } elseif {$command eq "set_target"} {
-        # auth after subscribe
+        # auth after subscribe for stratum mode
         pool_auth $conn $config_user $config_pass
     } elseif {$command eq "set_subscribe_params"} {
         # nothing for now
@@ -211,10 +218,15 @@ proc create_pool_conn {host port} {
 }
 
 proc wait_for_nonce {conn} {
+    global config_mode
     while {1} {
         set solved_work [get_result_from_fpga]
         if {$solved_work ne ""} {
-            submit_nonce $conn $solved_work
+            if {$config_mode eq "stratum"} {
+                submit_nonce $conn $solved_work
+            } else {
+                submit_work $conn $solved_work
+            }
         }
         # Allow pool connection to process
         update

@@ -20,8 +20,10 @@ your installation.  For example ``export QUARTUSPATH="/home/miner/altera/18.1/qu
 This line should be added to your ``~/.profile`` file or another file that is sourced whenever a
 shell is launched.  Don't forget to source the file after editing it.
 
-Solo Mining
------------
+Local Solo Mining
+-----------------
+
+Local Digibyte node is required.
 
 Install and start a full node via <https://github.com/digibyte/digibyte>.
 
@@ -31,18 +33,11 @@ Install and start a full node via <https://github.com/digibyte/digibyte>.
 Stratum Pool Mining
 -------------------
 
-Full node is not required.
-
-Odocrypt Solo Pool at Testnet is up and running at <https://dgb256.online/odo/>
-
-Odocrypt PPLNS Pool at Testnet is up and running at <https://odo.dgb256.online/>
-
-It will be switched to Mainnet after block 9,100,000
+Local Digibyte node is *not* required.
 
 * ``src/pool/solo/stratum_proxy.py`` included for stratum-based mining, it should be started instead of ``pool.py``
-* Digibyte address need to be specified at ``src/miner/config.tcl``
-* Usage ``python stratum_proxy.py host port``
-* Example for Solo Pool ``python stratum_proxy.py solo.dgb256.online 8883``
+* Pool auth user need to be specified at ``src/miner/config.tcl`` and ``config_mode`` set to ``stratum`` as well as ``config_port``. Sample configuration file ``config.tcl.sample.stratum`` is included
+* Usage ``python stratum_proxy.py stratum_host stratum_port``
 
 Additional Files
 ----------------

@@ -98,7 +98,10 @@ class ProxyClientProtocol(protocol.Protocol):
                     else:
                         modifiedchunk = val   # send unmodified content
                 elif data.has_key('reject-reason'):
-                         modifiedchunk = "result rejected %s" % str(data.get('reject-reason'))
+                         if str(data.get('reject-reason')) == "Stale":
+                             modifiedchunk = "result stale"
+                         else:
+                             modifiedchunk = "result inconclusive"
                 elif data.has_key('result'):
                     if data.get('result') == True:
                          modifiedchunk = "result accepted"
@@ -190,6 +193,7 @@ if __name__ == "__main__":
     parser.add_argument("pool_host", metavar="stratum_host", help="stratum tcp host")
     parser.add_argument("pool_port", metavar="stratum_port", help="stratum tcp port", type=int, choices=range(1,65535))
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+    parser.add_argument("--listen", metavar="port", help="listen tcp port", type=int, choices=range(1,65535), default=17065)
 
     arguments = vars(parser.parse_args())
     log.startLogging(sys.stdout)
@@ -197,9 +201,10 @@ if __name__ == "__main__":
     ProxyServer.stratumHost = arguments["pool_host"]
     ProxyServer.stratumPort = arguments["pool_port"]
     verbose = arguments["verbose"]
+    listen_port = arguments["listen"]
 
     log.startLogging(sys.stdout)
     factory = protocol.Factory()
     factory.protocol = ProxyServer
-    reactor.listenTCP(9999, factory, interface="0.0.0.0")
+    reactor.listenTCP(listen_port, factory, interface="0.0.0.0")
     reactor.run()
