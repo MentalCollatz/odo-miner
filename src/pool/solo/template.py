@@ -265,9 +265,7 @@ def get_params_header(params, enonce1, nonce2, nonce2len):
     txids = [unhexlify(tx) for tx in merklearr]
     mbranch = merkle_branch(txids)
 
-    nonce2str = hexlify(serialize_int(nonce2))
-    nonce2hex = '0'* ((nonce2len*2)-len(nonce2str)) + nonce2str
-
+    nonce2hex = n2hex(nonce2, nonce2len)
     coinbasehex = coinbase1+enonce1+nonce2hex+coinbase2
     coinbasetxid = sha256d(unhexlify(coinbasehex))
 
@@ -279,6 +277,11 @@ def get_params_header(params, enonce1, nonce2, nonce2len):
     data += b'\0\0\0\0' # nonce
 
     return str(hexlify(data))
+
+def n2hex(nonce2, nonce2len):
+    nonce2str = hexlify(serialize_int(nonce2))
+    nonce2hex = '0'* ((nonce2len*2)-len(nonce2str)) + nonce2str
+    return nonce2hex
 
 def difficulty_to_hextarget(difficulty):
     assert difficulty >= 0

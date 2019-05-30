@@ -1,5 +1,18 @@
 #!/usr/bin/env python
-# Forked from https://gist.github.com/fiorix/1878983
+
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
 import json
@@ -17,6 +30,7 @@ from binascii import hexlify, unhexlify
 
 clicounter = 0
 extra_nonce = 0
+verbose = False
 
 def toJson(obj):
     return json.dumps(obj).encode("utf-8")
@@ -27,6 +41,7 @@ def fromJson(str):
 class ProxyClientProtocol(protocol.Protocol):
     def connectionMade(self):
         global clicounter
+        global verbose
         self.client_id = clicounter
         clicounter += 1
         log.msg("Client[%d]: connected to peer" % self.client_id)
@@ -43,7 +58,8 @@ class ProxyClientProtocol(protocol.Protocol):
             self.factory.continueTrying = False
             self.transport.loseConnection()
         elif self.cli_queue:
-            log.msg("Client: writing %d bytes to peer" % len(chunk))
+            if verbose:
+                log.msg("Client: writing %d bytes to peer" % len(chunk))
             self.transport.write(chunk)
             self.cli_queue.get().addCallback(self.serverDataReceived)
         else:
@@ -51,7 +67,9 @@ class ProxyClientProtocol(protocol.Protocol):
 
     def dataReceived(self, chunk):
         global extra_nonce
-        log.msg("Client: %d bytes received from peer" % len(chunk))
+        global verbose
+        if verbose:
+            log.msg("Client: %d bytes received from peer" % len(chunk))
         curstr = chunk.splitlines()
         disconnectflag = False
         for val in curstr:
@@ -71,12 +89,12 @@ class ProxyClientProtocol(protocol.Protocol):
                             extra_nonce = 0
                         else:
                             extra_nonce += 1
-                        self.cli_nonce2 = extra_nonce
-                        p_header = template.get_params_header(data.get('params'), self.cli_enonce1, self.cli_nonce2, self.cli_nonce2len)
+                        p_header = template.get_params_header(data.get('params'), self.cli_enonce1, extra_nonce, self.cli_n2len)
                         self.cli_idstring = str(data.get('params')[0])
                         self.cli_time     = str(data.get('params')[7])
                         self.cli_odokey   = int(data.get('odokey'))
-                        modifiedchunk = "work %s %s %d %s %s %d" % (p_header, self.cli_target, self.cli_odokey, self.cli_idstring, self.cli_time, self.cli_nonce2)
+                        self.cli_nonce2   = template.n2hex(extra_nonce, self.cli_n2len)
+                        modifiedchunk = "work %s %s %d %s %s %s" % (p_header, self.cli_target, self.cli_odokey, self.cli_idstring, self.cli_time, self.cli_nonce2)
                     else:
                         modifiedchunk = val   # send unmodified content
                 elif data.has_key('reject-reason'):
@@ -86,8 +104,8 @@ class ProxyClientProtocol(protocol.Protocol):
                          modifiedchunk = "result accepted"
                     elif data.get('id') == 0:
                          self.cli_enonce1 = str(data.get('result')[1])
-                         self.cli_nonce2len = int(data.get('result')[2])
-                         modifiedchunk = "set_subscribe_params %s %d" % (self.cli_enonce1, self.cli_nonce2len)
+                         self.cli_n2len = int(data.get('result')[2])
+                         modifiedchunk = "set_subscribe_params %s %d" % (self.cli_enonce1, self.cli_n2len)
                     else:
                         modifiedchunk = val
 
@@ -116,6 +134,7 @@ class ProxyClientFactory(protocol.ReconnectingClientFactory):
         self.cli_queue = cli_queue
 
 class ProxyServer(protocol.Protocol):
+    global verbose
     def connectionMade(self):
         self.srv_queue = defer.DeferredQueue()
         self.cli_queue = defer.DeferredQueue()
@@ -126,7 +145,8 @@ class ProxyServer(protocol.Protocol):
         reactor.connectTCP(self.stratumHost, self.stratumPort, factory)
 
     def clientDataReceived(self, chunk):
-        log.msg("Server: writing %d bytes to original client" % len(chunk))
+        if verbose:
+            log.msg("Server: writing %d bytes to original client" % len(chunk))
         self.transport.write(chunk)
         self.srv_queue.get().addCallback(self.clientDataReceived)
 
@@ -140,16 +160,15 @@ class ProxyServer(protocol.Protocol):
         return modifiedchunk
 
     def dataReceived(self, chunk):
-        log.msg("Server: %d bytes received" % len(chunk))
+        if verbose:
+            log.msg("Server: %d bytes received" % len(chunk))
         try:
             if re.match(r'auth', chunk):
                 self.cli_rpcid = 1
                 modifiedchunk = self.doAuth(chunk)
             elif re.match(r'submit_nonce', chunk):
-                match_obj = re.match(r'submit_nonce\s(\w+)\s(\w+)\s(\w+)\s(\d+)', chunk)
-                nonce2str = hexlify(template.serialize_int(int(match_obj.group(4))))
-                nonce2hex = '0'* (8-len(nonce2str)) + nonce2str
-                params = [self.cli_authid, str(match_obj.group(2)), nonce2hex, str(match_obj.group(3)), str(match_obj.group(1))]
+                match_obj = re.match(r'submit_nonce\s(\w+)\s(\w+)\s(\w+)\s(\w+)', chunk)
+                params = [self.cli_authid, str(match_obj.group(2)), match_obj.group(4), str(match_obj.group(3)), str(match_obj.group(1))]
                 modifiedchunk = toJson({'id':self.cli_rpcid, 'method':'mining.submit','params':params})
                 self.cli_rpcid += 1
             else:
@@ -170,12 +189,14 @@ if __name__ == "__main__":
 
     parser.add_argument("pool_host", metavar="stratum_host", help="stratum tcp host")
     parser.add_argument("pool_port", metavar="stratum_port", help="stratum tcp port", type=int, choices=range(1,65535))
+    parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
 
     arguments = vars(parser.parse_args())
     log.startLogging(sys.stdout)
 
     ProxyServer.stratumHost = arguments["pool_host"]
     ProxyServer.stratumPort = arguments["pool_port"]
+    verbose = arguments["verbose"]
 
     log.startLogging(sys.stdout)
     factory = protocol.Factory()
