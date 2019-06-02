@@ -127,8 +127,6 @@ proc add_result {status} {
 }
 
 proc receive_data {conn} {
-    global config_user
-    global config_pass
     fconfigure $conn -blocking 1
     gets $conn data
     if {$data eq ""} {
@@ -147,9 +145,12 @@ proc receive_data {conn} {
     # result <status>
     } elseif {$command eq "result" && [llength $args] == 1} {
         add_result {*}$args
+    } elseif {$command eq "connected"} {
+        status_print -type info "connected to $args"
     } elseif {$command eq "set_target"} {
-        # auth after subscribe for stratum mode
-        pool_auth $conn $config_user $config_pass
+        status_print -type info "pool target $args"
+        # auth after difficulty param received
+        pool_auth $conn
     } elseif {$command eq "authorized"} {
         status_print -type info "authorized"
     } elseif {$command eq "set_subscribe_params"} {
@@ -167,7 +168,6 @@ proc submit_nonce {conn nonce} {
 
     fconfigure $conn -blocking 1
     puts $conn "submit_nonce $nonce $stratum_idstring $stratum_ntime $stratum_nonce2"
-    status_print "submit_nonce $nonce $stratum_idstring $stratum_ntime $stratum_nonce2"
     flush $conn
     fconfigure $conn -blocking 0
 }
@@ -175,15 +175,6 @@ proc submit_nonce {conn nonce} {
 proc submit_work {conn work} {
     fconfigure $conn -blocking 1
     puts $conn "submit $work"
-    status_print "submit $work"
-    flush $conn
-    fconfigure $conn -blocking 0
-}
-
-proc pool_auth {conn user pass} {
-    fconfigure $conn -blocking 1
-    puts $conn "auth $user $pass"
-    status_print "auth $user $pass"
     flush $conn
     fconfigure $conn -blocking 0
 }
@@ -208,13 +199,32 @@ proc choose_hardware {argv} {
 }
 
 # Create a connection to the pool (or bridge, as will likely be the case)
-proc create_pool_conn {host port} {
-    set conn [socket $host $port]
+proc create_pool_conn {} {
+    global config_host
+    global default_stratum_port
+    global default_solo_port
+    global config_mode
+    if {$config_mode eq "stratum"} {
+        set conn [socket $config_host $default_stratum_port]
+    } else {
+        set conn [socket $config_host $default_solo_port]
+    }
     fconfigure $conn -translation binary
     fconfigure $conn -buffering line
     fconfigure $conn -blocking 0
     fileevent $conn readable [list receive_data $conn]
     return $conn
+}
+
+proc pool_auth {conn} {
+    global miner_id
+    # leave only numbers from miner_id
+    regsub -all -- {[^0-9]} $miner_id "" worker
+    fconfigure $conn -blocking 1
+    puts $conn "auth $worker"
+    status_print "auth worker $worker"
+    flush $conn
+    fconfigure $conn -blocking 0
 }
 
 proc wait_for_nonce {conn} {
@@ -239,5 +249,5 @@ choose_hardware $argv
 #if {[fpga_init $hardware_name]} {
 #    set last_seed [get_fpga_seed]
 #}
-set conn [create_pool_conn $config_host $config_port]
+set conn [create_pool_conn]
 wait_for_nonce $conn

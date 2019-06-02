@@ -18,6 +18,7 @@ import sys
 import json
 import re
 import random
+from string import digits
 
 import header
 
@@ -29,6 +30,7 @@ from twisted.python import log
 clicounter = 0
 extra_nonce = 0
 verbose = False
+useworkers = False
 
 def toJson(obj):
     return json.dumps(obj).encode("utf-8")
@@ -81,7 +83,8 @@ class ProxyClientProtocol(protocol.Protocol):
                         if self.cli_diff < 1:    # it should not be happen but anyway
                             self.cli_diff = 1
                         self.cli_target = header.difficulty_to_hextarget(self.cli_diff)
-                        modifiedchunk   = "set_target %s diff %d" % (self.cli_target, self.cli_diff)
+                        modifiedchunk   = "connected to %s:%s" % (ProxyServer.stratumHost, ProxyServer.stratumPort)+'\n'
+                        modifiedchunk  += "set_target %s diff %d" % (self.cli_target, self.cli_diff)
                     elif data.get('method') == 'mining.notify':
                         self.cli_wbclean = data.get('params')[8]
                         if self.cli_wbclean and extra_nonce > 0:
@@ -139,6 +142,7 @@ class ProxyClientFactory(protocol.ReconnectingClientFactory):
 
 class ProxyServer(protocol.Protocol):
     global verbose
+    global useworkers
     def connectionMade(self):
         self.srv_queue = defer.DeferredQueue()
         self.cli_queue = defer.DeferredQueue()
@@ -155,19 +159,23 @@ class ProxyServer(protocol.Protocol):
         self.srv_queue.get().addCallback(self.clientDataReceived)
 
     def doAuth(self, chunk):
-        match_obj = re.match(r'auth\s(\w+)\s(\w+)', chunk)
-        params = match_obj.group(1,2)
-        self.cli_authid = match_obj.group(1)
+        match_obj = re.match(r'auth\s(.+)', chunk)
+        if useworkers:
+            self.cli_authid = ''.join([ProxyServer.stratumUser, "_", match_obj.group(1)])
+        else:
+            self.cli_authid = ProxyServer.stratumUser
+        params = [self.cli_authid, ProxyServer.stratumPass]
         modifiedchunk = toJson({'id':self.cli_rpcid, 'method':'mining.authorize','params':params})
         self.cli_rpcid += 1
         self.cli_auth = modifiedchunk
+        log.msg("Stratum: authorised as %s with password %s" % (self.cli_authid, self.stratumPass))
         return modifiedchunk
 
     def dataReceived(self, chunk):
         if verbose:
             log.msg("Server: %d bytes received" % len(chunk))
         try:
-            if re.match(r'auth', chunk):
+            if re.match(r'auth\s(.+)', chunk):
                 self.cli_rpcid = 1
                 modifiedchunk = self.doAuth(chunk)
             elif re.match(r'submit_nonce', chunk):
@@ -193,7 +201,10 @@ if __name__ == "__main__":
 
     parser.add_argument("pool_host", metavar="stratum_host", help="stratum tcp host")
     parser.add_argument("pool_port", metavar="stratum_port", help="stratum tcp port", type=int, choices=range(1,65535))
+    parser.add_argument("pool_user", metavar="username", help="pool username or address")
+    parser.add_argument("pool_pass", metavar="password", help="pool password")
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+    parser.add_argument("-w", "--workers", help="use workers", action="store_true")
     parser.add_argument("--listen", metavar="port", help="listen tcp port", type=int, choices=range(1,65535), default=17065)
 
     arguments = vars(parser.parse_args())
@@ -201,11 +212,14 @@ if __name__ == "__main__":
 
     ProxyServer.stratumHost = arguments["pool_host"]
     ProxyServer.stratumPort = arguments["pool_port"]
+    ProxyServer.stratumUser = arguments["pool_user"]
+    ProxyServer.stratumPass = arguments["pool_pass"]
     verbose = arguments["verbose"]
+    useworkers = arguments["workers"]
     listen_port = arguments["listen"]
 
     log.startLogging(sys.stdout)
     factory = protocol.Factory()
     factory.protocol = ProxyServer
-    reactor.listenTCP(listen_port, factory, interface="0.0.0.0")
+    reactor.listenTCP(listen_port, factory, interface="127.0.0.1")
     reactor.run()
