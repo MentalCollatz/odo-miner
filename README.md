@@ -35,9 +35,9 @@ Stratum Pool Mining
 
 Local Digibyte node is *not* required.
 
-* ``src/pool/solo/stratum_proxy.py`` included for stratum-based mining, it should be started instead of ``pool.py``
+* Twisted python module is required, to install use ``apt-get install python-twisted`` or ``pip install twisted`` in case of pip already installed
+* ``src/pool/stratum/stratum.py`` is included for stratum-based mining
 * Pool auth user need to be specified at ``src/miner/config.tcl`` and ``config_mode`` set to ``stratum`` as well as ``config_port``. Sample configuration file ``config.tcl.sample.stratum`` is included
-* Usage ``python stratum_proxy.py stratum_host stratum_port``
 
 Additional Files
 ----------------
@@ -63,8 +63,8 @@ Starting to Mine
 
 This will require multiple terminal windows.  A screen multiplexer such as [tmux](https://github.com/tmux/tmux/wiki) or [screen](https://www.gnu.org/software/screen/) may make things easier for you.
 
-* Ensure your DigiByte node is running.  It is recommended that you do not specify an rpcpassword in digibyte.conf.  The rpcuser and rpcpassword options will soon be deprecated.
+* If solo mining with local node - ensure your DigiByte node is running.  It is recommended that you do not specify an rpcpassword in digibyte.conf.  The rpcuser and rpcpassword options will soon be deprecated.
 * In one terminal, go to the ``src`` directory and run ``./autocompile.sh --testnet cyclone_v_gx_starter_kit de10_nano``
-* In another terminal, go to the ``src/pool/solo`` directory and run ``python pool.py --testnet <dgb_address>`` or use ``stratum_proxy.py``
+* For Solo mining: in another terminal, go to the ``src/pool/solo`` directory and run ``python pool.py --testnet <dgb_address>``
+* For Pool mining: in another terminal, go to the ``src/pool/stratum`` directory and run ``python stratum.py stratum_host stratum_port``
 * Finally, for each mining fpga open a terminal in the ``src/miner`` directory and run ``$QUARTUSPATH/quartus_stp -t mine.tcl [hardware_name]``.  The ``hardware_name`` argument is optional, and if not specified the script will prompt you to select one of the detected mining devices.  If you're comfortable using [screen](https://www.gnu.org/software/screen/), you can run ``src/miner/mine_in_screen.sh`` instead to start a screen session with one window per mining device.
-

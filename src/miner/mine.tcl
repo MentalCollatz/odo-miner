@@ -150,10 +150,10 @@ proc receive_data {conn} {
     } elseif {$command eq "set_target"} {
         # auth after subscribe for stratum mode
         pool_auth $conn $config_user $config_pass
+    } elseif {$command eq "authorized"} {
+        status_print -type info "authorized"
     } elseif {$command eq "set_subscribe_params"} {
-        # nothing for now
-    } elseif {$command eq "mining_notify"} {
-        # nothing for now
+        # nothing for now, just a valid command
     } else {
         status_print -type warning "Unknown command: $command $args"
     }

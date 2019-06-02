@@ -19,14 +19,12 @@ import json
 import re
 import random
 
-import template
+import header
 
 from twisted.internet import defer
 from twisted.internet import protocol
 from twisted.internet import reactor
 from twisted.python import log
-
-from binascii import hexlify, unhexlify
 
 clicounter = 0
 extra_nonce = 0
@@ -65,6 +63,7 @@ class ProxyClientProtocol(protocol.Protocol):
         else:
             self.factory.cli_queue.put(chunk)
 
+
     def dataReceived(self, chunk):
         global extra_nonce
         global verbose
@@ -81,7 +80,7 @@ class ProxyClientProtocol(protocol.Protocol):
                         log.msg("diff from stratum = %d" % self.cli_diff)
                         if self.cli_diff < 1:    # it should not be happen but anyway
                             self.cli_diff = 1
-                        self.cli_target = template.difficulty_to_hextarget(self.cli_diff)
+                        self.cli_target = header.difficulty_to_hextarget(self.cli_diff)
                         modifiedchunk   = "set_target %s diff %d" % (self.cli_target, self.cli_diff)
                     elif data.get('method') == 'mining.notify':
                         self.cli_wbclean = data.get('params')[8]
@@ -89,11 +88,11 @@ class ProxyClientProtocol(protocol.Protocol):
                             extra_nonce = 0
                         else:
                             extra_nonce += 1
-                        p_header = template.get_params_header(data.get('params'), self.cli_enonce1, extra_nonce, self.cli_n2len)
+                        p_header = header.get_params_header(data.get('params'), self.cli_enonce1, extra_nonce, self.cli_n2len)
                         self.cli_idstring = str(data.get('params')[0])
                         self.cli_time     = str(data.get('params')[7])
                         self.cli_odokey   = int(data.get('odokey'))
-                        self.cli_nonce2   = template.n2hex(extra_nonce, self.cli_n2len)
+                        self.cli_nonce2   = header.n2hex(extra_nonce, self.cli_n2len)
                         modifiedchunk = "work %s %s %d %s %s %s" % (p_header, self.cli_target, self.cli_odokey, self.cli_idstring, self.cli_time, self.cli_nonce2)
                     else:
                         modifiedchunk = val   # send unmodified content
@@ -103,7 +102,9 @@ class ProxyClientProtocol(protocol.Protocol):
                          else:
                              modifiedchunk = "result inconclusive"
                 elif data.has_key('result'):
-                    if data.get('result') == True:
+                    if data.get('result') == True and data.get('id') == 1:
+                         modifiedchunk = "authorized"
+                    elif data.get('result') == True:
                          modifiedchunk = "result accepted"
                     elif data.get('id') == 0:
                          self.cli_enonce1 = str(data.get('result')[1])
