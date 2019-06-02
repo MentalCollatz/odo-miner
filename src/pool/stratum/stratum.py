@@ -27,7 +27,7 @@ from twisted.internet import protocol
 from twisted.internet import reactor
 from twisted.python import log
 
-clicounter = 0
+conncounter = 0
 extra_nonce = 0
 verbose = False
 useworkers = False
@@ -40,11 +40,11 @@ def fromJson(str):
 
 class ProxyClientProtocol(protocol.Protocol):
     def connectionMade(self):
-        global clicounter
+        global conncounter
         global verbose
-        self.client_id = clicounter
-        clicounter += 1
-        log.msg("Client[%d]: connected to peer" % self.client_id)
+        self.conn_id = conncounter
+        conncounter += 1
+        log.msg("Conn[%d]: connected to peer" % self.conn_id)
         self.cli_queue = self.factory.cli_queue
         self.cli_queue.get().addCallback(self.serverDataReceived)
         # subscribe after connect
@@ -83,7 +83,7 @@ class ProxyClientProtocol(protocol.Protocol):
                         if self.cli_diff < 1:    # it should not be happen but anyway
                             self.cli_diff = 1
                         self.cli_target = header.difficulty_to_hextarget(self.cli_diff)
-                        modifiedchunk   = "connected to %s:%s" % (ProxyServer.stratumHost, ProxyServer.stratumPort)+'\n'
+                        modifiedchunk   = "connected %s:%s" % (ProxyServer.stratumHost, ProxyServer.stratumPort)+'\n'
                         modifiedchunk  += "set_target %s diff %d" % (self.cli_target, self.cli_diff)
                     elif data.get('method') == 'mining.notify':
                         self.cli_wbclean = data.get('params')[8]
