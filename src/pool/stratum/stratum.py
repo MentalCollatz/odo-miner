@@ -18,7 +18,6 @@ import sys
 import json
 import re
 import random
-from string import digits
 
 import header
 
@@ -31,6 +30,7 @@ conncounter = 0
 extra_nonce = 0
 verbose = False
 useworkers = False
+testnet = False
 
 def toJson(obj):
     return json.dumps(obj).encode("utf-8")
@@ -50,6 +50,7 @@ class ProxyClientProtocol(protocol.Protocol):
         # subscribe after connect
         subscribe = toJson({'id':0, 'method':'mining.subscribe','params':["odominer"]})
         self.cli_queue.put(subscribe+'\n')
+        self.cli_odokey_notify = True
 
     def serverDataReceived(self, chunk):
         if chunk is False:
@@ -69,6 +70,7 @@ class ProxyClientProtocol(protocol.Protocol):
     def dataReceived(self, chunk):
         global extra_nonce
         global verbose
+        global testnet
         if verbose:
             log.msg("Client: %d bytes received from peer" % len(chunk))
         curstr = chunk.splitlines()
@@ -78,7 +80,7 @@ class ProxyClientProtocol(protocol.Protocol):
                 data = fromJson(val)
                 if data.has_key('method'):
                     if data.get('method') == 'mining.set_difficulty':
-                        self.cli_diff   = int(data.get('params')[0])
+                        self.cli_diff = int(data.get('params')[0])
                         log.msg("diff from stratum = %d" % self.cli_diff)
                         if self.cli_diff < 1:    # it should not be happen but anyway
                             self.cli_diff = 1
@@ -94,7 +96,19 @@ class ProxyClientProtocol(protocol.Protocol):
                         p_header = header.get_params_header(data.get('params'), self.cli_enonce1, extra_nonce, self.cli_n2len)
                         self.cli_idstring = str(data.get('params')[0])
                         self.cli_time     = str(data.get('params')[7])
-                        self.cli_odokey   = int(data.get('odokey'))
+                        if data.has_key('odokey'):
+                            self.cli_odokey = int(data.get('odokey'))
+                            if verbose and self.cli_odokey_notify:
+                                log.msg("Stratum: odokey is provided by mining.notify, value is %d" % self.cli_odokey)
+                                self.cli_odokey_notify = False
+                        else:
+                            if testnet:
+                                self.cli_odokey = header.odokey_from_ntime(self.cli_time, True)
+                            else:
+                                self.cli_odokey = header.odokey_from_ntime(self.cli_time, False)
+                            if verbose and self.cli_odokey_notify:
+                                log.msg("Stratum: odokey is not provided by mining.notify, calculated from nTime, value is %d" % self.cli_odokey)
+                                self.cli_odokey_notify = False
                         self.cli_nonce2   = header.n2hex(extra_nonce, self.cli_n2len)
                         modifiedchunk = "work %s %s %d %s %s %s" % (p_header, self.cli_target, self.cli_odokey, self.cli_idstring, self.cli_time, self.cli_nonce2)
                     else:
@@ -165,8 +179,8 @@ class ProxyServer(protocol.Protocol):
         else:
             self.cli_authid = ProxyServer.stratumUser
         params = [self.cli_authid, ProxyServer.stratumPass]
-        modifiedchunk = toJson({'id':self.cli_rpcid, 'method':'mining.authorize','params':params})
-        self.cli_rpcid += 1
+        modifiedchunk = toJson({'id':self.cli_jsonid, 'method':'mining.authorize','params':params})
+        self.cli_jsonid += 1
         self.cli_auth = modifiedchunk
         log.msg("Stratum: authorised as %s with password %s" % (self.cli_authid, self.stratumPass))
         return modifiedchunk
@@ -176,13 +190,13 @@ class ProxyServer(protocol.Protocol):
             log.msg("Server: %d bytes received" % len(chunk))
         try:
             if re.match(r'auth\s(.+)', chunk):
-                self.cli_rpcid = 1
+                self.cli_jsonid = 1
                 modifiedchunk = self.doAuth(chunk)
             elif re.match(r'submit_nonce', chunk):
                 match_obj = re.match(r'submit_nonce\s(\w+)\s(\w+)\s(\w+)\s(\w+)', chunk)
                 params = [self.cli_authid, str(match_obj.group(2)), match_obj.group(4), str(match_obj.group(3)), str(match_obj.group(1))]
-                modifiedchunk = toJson({'id':self.cli_rpcid, 'method':'mining.submit','params':params})
-                self.cli_rpcid += 1
+                modifiedchunk = toJson({'id':self.cli_jsonid, 'method':'mining.submit','params':params})
+                self.cli_jsonid += 1
             else:
                 modifiedchunk = chunk   # send unmodified content
             self.cli_queue.put(modifiedchunk+'\n')    # send processed input
@@ -205,6 +219,7 @@ if __name__ == "__main__":
     parser.add_argument("pool_pass", metavar="password", help="pool password")
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
     parser.add_argument("-w", "--workers", help="use workers", action="store_true")
+    parser.add_argument("-t", "--testnet", help="use testnet", action="store_true")
     parser.add_argument("--listen", metavar="port", help="listen tcp port", type=int, choices=range(1,65535), default=17065)
 
     arguments = vars(parser.parse_args())
@@ -216,7 +231,11 @@ if __name__ == "__main__":
     ProxyServer.stratumPass = arguments["pool_pass"]
     verbose = arguments["verbose"]
     useworkers = arguments["workers"]
+    testnet = arguments["testnet"]
     listen_port = arguments["listen"]
+
+    if testnet:
+        log.msg("Working in a testnet mode")
 
     log.startLogging(sys.stdout)
     factory = protocol.Factory()

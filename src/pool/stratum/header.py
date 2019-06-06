@@ -26,6 +26,15 @@ from template import sha256d, merkle_root, merkle_branch, serialize_int
 def swap_order(d, wsz=8, gsz=1 ):
     return "".join(["".join([m[i:i+gsz] for i in range(wsz-gsz,-gsz,-gsz)]) for m in [d[i:i+wsz] for i in range(0,len(d),wsz)]])
 
+def odokey_from_ntime(curtime, testnet):
+    if testnet:
+        nOdoShapechangeInterval = 1*24*60*60     # 1 days, testnet
+    else:
+        nOdoShapechangeInterval = 10*24*60*60    # 10 days, mainnet
+    ntime = int(curtime, 16)
+    odokey  = ntime - ntime % nOdoShapechangeInterval
+    return odokey
+
 def get_params_header(params, enonce1, nonce2, nonce2len):
     idstring  = params[0]
     prevhash  = swap_order(params[1][::-1])
