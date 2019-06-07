@@ -85,8 +85,7 @@ class ProxyClientProtocol(protocol.Protocol):
                         if self.cli_diff < 1:    # it should not be happen but anyway
                             self.cli_diff = 1
                         self.cli_target = header.difficulty_to_hextarget(self.cli_diff)
-                        modifiedchunk   = "connected %s:%s" % (ProxyServer.stratumHost, ProxyServer.stratumPort)+'\n'
-                        modifiedchunk  += "set_target %s diff %d" % (self.cli_target, self.cli_diff)
+                        modifiedchunk = "set_target %s diff %d" % (self.cli_target, self.cli_diff)
                     elif data.get('method') == 'mining.notify':
                         self.cli_wbclean = data.get('params')[8]
                         if self.cli_wbclean and extra_nonce > 0:
@@ -109,7 +108,7 @@ class ProxyClientProtocol(protocol.Protocol):
                             if verbose and self.cli_odokey_notify:
                                 log.msg("Stratum: odokey is not provided by mining.notify, calculated from nTime, value is %d" % self.cli_odokey)
                                 self.cli_odokey_notify = False
-                        self.cli_nonce2   = header.n2hex(extra_nonce, self.cli_n2len)
+                        self.cli_nonce2 = header.n2hex(extra_nonce, self.cli_n2len)
                         modifiedchunk = "work %s %s %d %s %s %s" % (p_header, self.cli_target, self.cli_odokey, self.cli_idstring, self.cli_time, self.cli_nonce2)
                     else:
                         modifiedchunk = val   # send unmodified content
@@ -126,7 +125,8 @@ class ProxyClientProtocol(protocol.Protocol):
                     elif data.get('id') == 0:
                          self.cli_enonce1 = str(data.get('result')[1])
                          self.cli_n2len = int(data.get('result')[2])
-                         modifiedchunk = "set_subscribe_params %s %d" % (self.cli_enonce1, self.cli_n2len)
+                         modifiedchunk = "connected %s:%s" % (ProxyServer.stratumHost, ProxyServer.stratumPort)+'\n'
+                         modifiedchunk += "set_subscribe_params %s %d" % (self.cli_enonce1, self.cli_n2len)
                     else:
                         modifiedchunk = val
 

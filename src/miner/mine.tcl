@@ -147,14 +147,13 @@ proc receive_data {conn} {
         add_result {*}$args
     } elseif {$command eq "connected"} {
         status_print -type info "connected to $args"
-    } elseif {$command eq "set_target"} {
-        status_print -type info "pool target $args"
-        # auth after difficulty param received
+    } elseif {$command eq "set_subscribe_params"} {
+        # auth after subscribe response
         pool_auth $conn
     } elseif {$command eq "authorized"} {
         status_print -type info "authorized"
-    } elseif {$command eq "set_subscribe_params"} {
-        # nothing for now, just a valid command
+    } elseif {$command eq "set_target"} {
+        status_print -type info "pool target $args"
     } else {
         status_print -type warning "Unknown command: $command $args"
     }
@@ -222,7 +221,7 @@ proc pool_auth {conn} {
     regsub -all -- {[^0-9]} $miner_id "" worker
     fconfigure $conn -blocking 1
     puts $conn "auth $worker"
-    status_print "auth worker $worker"
+    status_print "auth request for worker $worker"
     flush $conn
     fconfigure $conn -blocking 0
 }
