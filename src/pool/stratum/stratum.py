@@ -82,8 +82,6 @@ class ProxyClientProtocol(protocol.Protocol):
                     if data.get('method') == 'mining.set_difficulty':
                         self.cli_diff = int(data.get('params')[0])
                         log.msg("diff from stratum = %d" % self.cli_diff)
-                        if self.cli_diff < 1:    # it should not be happen but anyway
-                            self.cli_diff = 1
                         self.cli_target = header.difficulty_to_hextarget(self.cli_diff)
                         modifiedchunk = "set_target %s diff %d" % (self.cli_target, self.cli_diff)
                     elif data.get('method') == 'mining.notify':
