@@ -80,10 +80,10 @@ class ProxyClientProtocol(protocol.Protocol):
                 data = fromJson(val)
                 if data.has_key('method'):
                     if data.get('method') == 'mining.set_difficulty':
-                        self.cli_diff = int(data.get('params')[0])
-                        log.msg("diff from stratum = %d" % self.cli_diff)
+                        self.cli_diff = float(data.get('params')[0])
+                        log.msg("diff from stratum = %f" % self.cli_diff)
                         self.cli_target = header.difficulty_to_hextarget(self.cli_diff)
-                        modifiedchunk = "set_target %s diff %d" % (self.cli_target, self.cli_diff)
+                        modifiedchunk = "set_target %s diff %f" % (self.cli_target, self.cli_diff)
                     elif data.get('method') == 'mining.notify':
                         self.cli_wbclean = data.get('params')[8]
                         if self.cli_wbclean and extra_nonce > 0:
