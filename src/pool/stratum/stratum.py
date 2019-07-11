@@ -66,7 +66,6 @@ class ProxyClientProtocol(protocol.Protocol):
         else:
             self.factory.cli_queue.put(chunk)
 
-
     def dataReceived(self, chunk):
         global extra_nonce
         global verbose
@@ -140,8 +139,8 @@ class ProxyClientProtocol(protocol.Protocol):
     def connectionLost(self, why):
         if self.cli_queue:
             self.cli_queue = None
+            self.factory.srv_queue.put('disconnect')
             log.msg("Client: peer disconnected unexpectedly")
-
 
 class ProxyClientFactory(protocol.ReconnectingClientFactory):
     maxDelay = 10
