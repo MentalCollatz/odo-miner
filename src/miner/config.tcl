@@ -7,3 +7,6 @@ set default_stratum_port 17065
 
 # mining mode 'solo' or 'stratum'
 set config_mode stratum
+
+# stdout mode 'brief' or 'verbose'
+set config_output brief

@@ -31,6 +31,7 @@ extra_nonce = 0
 verbose = False
 useworkers = False
 testnet = False
+jobshow = False
 
 def toJson(obj):
     return json.dumps(obj).encode("utf-8")
@@ -51,6 +52,8 @@ class ProxyClientProtocol(protocol.Protocol):
         subscribe = toJson({'id':0, 'method':'mining.subscribe','params':["odominer"]})
         self.cli_queue.put(subscribe+'\n')
         self.cli_odokey_notify = True
+        self.cli_jobid = None
+        self.cli_prevblockhash = None
 
     def serverDataReceived(self, chunk):
         if chunk is False:
@@ -70,10 +73,12 @@ class ProxyClientProtocol(protocol.Protocol):
         global extra_nonce
         global verbose
         global testnet
+        global jobshow
         if verbose:
             log.msg("Client: %d bytes received from peer" % len(chunk))
         curstr = chunk.splitlines()
         disconnectflag = False
+
         for val in curstr:
             try:
                 data = fromJson(val)
@@ -83,30 +88,41 @@ class ProxyClientProtocol(protocol.Protocol):
                         log.msg("diff from stratum = %f" % self.cli_diff)
                         self.cli_target = header.difficulty_to_hextarget(self.cli_diff)
                         modifiedchunk = "set_target %s diff %f" % (self.cli_target, self.cli_diff)
+                    elif data.get('method') == 'client.reconnect':
+                        log.msg("Stratum: reconnect requested by a pool")
+                        disconnectflag = True
                     elif data.get('method') == 'mining.notify':
-                        self.cli_wbclean = data.get('params')[8]
-                        if self.cli_wbclean and extra_nonce > 0:
-                            extra_nonce = 0
-                        else:
-                            extra_nonce += 1
-                        p_header = header.get_params_header(data.get('params'), self.cli_enonce1, extra_nonce, self.cli_n2len)
-                        self.cli_idstring = str(data.get('params')[0])
-                        self.cli_time     = str(data.get('params')[7])
-                        if data.has_key('odokey'):
-                            self.cli_odokey = int(data.get('odokey'))
-                            if verbose and self.cli_odokey_notify:
-                                log.msg("Stratum: odokey is provided by mining.notify, value is %d" % self.cli_odokey)
-                                self.cli_odokey_notify = False
-                        else:
-                            if testnet:
-                                self.cli_odokey = header.odokey_from_ntime(self.cli_time, True)
+                        if data.get('params')[0] != self.cli_jobid:
+                            self.cli_jobid = data.get('params')[0]
+                            self.cli_prevblockhash = header.swap_order(data.get('params')[1][::-1])
+                            if jobshow:
+                                log.msg("Stratum: new job %s received, previous block hash %s" % (self.cli_jobid, self.cli_prevblockhash))
+                            self.cli_wbclean = data.get('params')[8]
+                            if self.cli_wbclean and extra_nonce > 0:
+                                extra_nonce = 0
                             else:
-                                self.cli_odokey = header.odokey_from_ntime(self.cli_time, False)
-                            if verbose and self.cli_odokey_notify:
-                                log.msg("Stratum: odokey is not provided by mining.notify, calculated from nTime, value is %d" % self.cli_odokey)
-                                self.cli_odokey_notify = False
-                        self.cli_nonce2 = header.n2hex(extra_nonce, self.cli_n2len)
-                        modifiedchunk = "work %s %s %d %s %s %s" % (p_header, self.cli_target, self.cli_odokey, self.cli_idstring, self.cli_time, self.cli_nonce2)
+                                extra_nonce += 1
+                            p_header = header.get_params_header(data.get('params'), self.cli_enonce1, extra_nonce, self.cli_n2len)
+                            self.cli_idstring = str(data.get('params')[0])
+                            self.cli_time     = str(data.get('params')[7])
+                            if data.has_key('odokey'):
+                                self.cli_odokey = int(data.get('odokey'))
+                                if verbose and self.cli_odokey_notify:
+                                    log.msg("Stratum: odokey is provided by mining.notify, value is %d" % self.cli_odokey)
+                                    self.cli_odokey_notify = False
+                            else:
+                                if testnet:
+                                    self.cli_odokey = header.odokey_from_ntime(self.cli_time, True)
+                                else:
+                                    self.cli_odokey = header.odokey_from_ntime(self.cli_time, False)
+                                if verbose and self.cli_odokey_notify:
+                                    log.msg("Stratum: odokey is not provided by mining.notify, calculated from nTime, value is %d" % self.cli_odokey)
+                                    self.cli_odokey_notify = False
+                            self.cli_nonce2 = header.n2hex(extra_nonce, self.cli_n2len)
+                            modifiedchunk = "work %s %s %d %s %s %s" % (p_header, self.cli_target, self.cli_odokey, self.cli_idstring, self.cli_time, self.cli_nonce2)
+                        else:
+                            modifiedchunk = None
+
                     else:
                         modifiedchunk = val   # send unmodified content
                 elif data.has_key('reject-reason'):
@@ -127,7 +143,8 @@ class ProxyClientProtocol(protocol.Protocol):
                     else:
                         modifiedchunk = val
 
-                self.factory.srv_queue.put(modifiedchunk+'\n')    # send processed input
+                if modifiedchunk is not None:
+                    self.factory.srv_queue.put(modifiedchunk+'\n')    # send processed input
             except Exception as e:
                 print(e)
                 disconnectflag = True    # we do not want process non-JSON messages, set flag to disconnect
@@ -139,7 +156,7 @@ class ProxyClientProtocol(protocol.Protocol):
     def connectionLost(self, why):
         if self.cli_queue:
             self.cli_queue = None
-            self.factory.srv_queue.put('disconnect')
+            self.factory.srv_queue.put('reconnect\n')
             log.msg("Client: peer disconnected unexpectedly")
 
 class ProxyClientFactory(protocol.ReconnectingClientFactory):
@@ -217,6 +234,7 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
     parser.add_argument("-w", "--workers", help="use workers", action="store_true")
     parser.add_argument("-t", "--testnet", help="use testnet", action="store_true")
+    parser.add_argument("-j", "--jobshow", help="show new job", action="store_true")
     parser.add_argument("--listen", metavar="port", help="listen tcp port", type=int, choices=range(1,65535), default=17065)
 
     arguments = vars(parser.parse_args())
@@ -229,6 +247,7 @@ if __name__ == "__main__":
     verbose = arguments["verbose"]
     useworkers = arguments["workers"]
     testnet = arguments["testnet"]
+    jobshow = arguments["jobshow"]
     listen_port = arguments["listen"]
 
     if testnet:

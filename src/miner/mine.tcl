@@ -101,6 +101,7 @@ proc set_work_stratum {data target seed idstring ntime nonce2} {
 }
 
 proc add_result {status} {
+    global config_output
     global epoch_results
     dict incr epoch_results $status
     set count [dict get $epoch_results $status]
@@ -111,18 +112,22 @@ proc add_result {status} {
     } else {
         set type error
     }
-    if {$count <= 10} {
+    if {$config_output eq "verbose"} {
         status_print -type $type "result $status"
-    } elseif {$count <= 100 && ($count % 10) == 0} {
-        status_print -type $type "result (x10) $status"
-    } elseif {($count % 100) == 0} {
-        status_print -type $type "result (x100) $status"
-    }
-    if {$count == 10} {
-        post_message -type $type "Future $status results will be batched in 10s"
-    }
-    if {$count == 100} {
-        post_message -type $type "Future $status results will be batched in 100s"
+    } else {
+        if {$count <= 10} {
+            status_print -type $type "result $status"
+        } elseif {$count <= 100 && ($count % 10) == 0} {
+            status_print -type $type "result (x10) $status"
+        } elseif {($count % 100) == 0} {
+            status_print -type $type "result (x100) $status"
+        }
+        if {$count == 10} {
+            post_message -type $type "Future $status results will be batched in 10s"
+        }
+        if {$count == 100} {
+            post_message -type $type "Future $status results will be batched in 100s"
+        }
     }
 }
 
@@ -154,6 +159,9 @@ proc receive_data {conn} {
         status_print -type info "authorized"
     } elseif {$command eq "set_target"} {
         status_print -type info "pool target $args"
+    } elseif {$command eq "reconnect"} {
+        status_print -type info "reconnect request received, clear work"
+        clear_fpga_work
     } else {
         status_print -type warning "Unknown command: $command $args"
     }
