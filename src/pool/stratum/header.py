@@ -20,11 +20,17 @@ from binascii import hexlify, unhexlify
 from hashlib import sha256
 from struct import pack
 
-sys.path.append("../solo/")  
+sys.path.append("../solo/")
 from template import sha256d, merkle_root, merkle_branch, serialize_int
 
 def swap_order(d, wsz=8, gsz=1 ):
     return "".join(["".join([m[i:i+gsz] for i in range(wsz-gsz,-gsz,-gsz)]) for m in [d[i:i+wsz] for i in range(0,len(d),wsz)]])
+
+def build_merkle_root(coinbase_hash_bin, merkle_b):
+    merkle_r = coinbase_hash_bin
+    for h in merkle_b:
+        merkle_r = sha256d(merkle_r + unhexlify(h))
+    return merkle_r
 
 def odokey_from_ntime(curtime, testnet):
     if testnet:
@@ -45,16 +51,13 @@ def get_params_header(params, enonce1, nonce2, nonce2len):
     bits      = params[6]
     curtime   = int(params[7], 16)
 
-    txids = [unhexlify(tx) for tx in merklearr]
-    mbranch = merkle_branch(txids)
-
     nonce2hex = n2hex(nonce2, nonce2len)
     coinbasehex = coinbase1+enonce1+nonce2hex+coinbase2
     coinbasetxid = sha256d(unhexlify(coinbasehex))
 
     data = pack('<I', version)
     data += unhexlify(prevhash)[::-1]
-    data += merkle_root(coinbasetxid, mbranch)
+    data += build_merkle_root(coinbasetxid, merklearr)
     data += pack('<I', curtime)
     data += unhexlify(bits)[::-1]
     data += b'\0\0\0\0' # nonce
