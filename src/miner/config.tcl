@@ -6,4 +6,4 @@ set default_solo_port 17064
 set default_stratum_port 17065
 
 # mining mode 'solo' or 'stratum'
-set config_mode solo
+set config_mode stratum
