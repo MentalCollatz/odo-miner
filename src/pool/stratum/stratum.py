@@ -224,7 +224,7 @@ class ProxyServer(protocol.Protocol):
 if __name__ == "__main__":
 
     from argparse import ArgumentParser
-    usage = "%prog <stratum tcp host> <stratum tcp port> [options]"
+    usage = "%prog <stratum tcp host> <stratum tcp port> <username> <password> [options]"
     parser = ArgumentParser(description=usage)
 
     parser.add_argument("pool_host", metavar="stratum_host", help="stratum tcp host")
