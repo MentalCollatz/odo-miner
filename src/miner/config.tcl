@@ -6,7 +6,7 @@ set default_solo_port 17064
 set default_stratum_port 17065
 
 # mining mode 'solo' or 'stratum'
-set config_mode stratum
+set config_mode solo
 
 # stdout mode 'brief' or 'verbose'
 set config_output brief
