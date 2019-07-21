@@ -62,7 +62,7 @@ Starting to Mine
 This will require multiple terminal windows.  A screen multiplexer such as [tmux](https://github.com/tmux/tmux/wiki) or [screen](https://www.gnu.org/software/screen/) may make things easier for you.
 
 * Set mining mode ``solo`` or ``stratum`` in ``config_mode`` variable at ``src/miner/config.tcl``
-* Command line argument ``--testnet`` should be used until block 9,100,000 for testnet4 mining
+* Command line argument ``--testnet`` should be used until block 9,112,320 for testnet4 mining
 * If solo mining with local node - ensure your DigiByte node is running.  It is recommended that you do not specify an rpcpassword in digibyte.conf.  The rpcuser and rpcpassword options will soon be deprecated.
 * In one terminal, go to the ``src`` directory and run ``./autocompile.sh --testnet cyclone_v_gx_starter_kit de10_nano``
 * For **Solo** mining: in another terminal, go to the ``src/pool/solo`` directory and run ``python pool.py --testnet <dgb_address>``
