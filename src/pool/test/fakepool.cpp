@@ -27,7 +27,7 @@
 #include <unistd.h>
 #include <thread>
 
-#include "../crypto/hashodo.h"
+#include "../../crypto/hashodo.h"
 
 const int MAINNET_EPOCH_LENGTH = 864000;
 const int TESTNET_EPOCH_LENGTH = 86400;

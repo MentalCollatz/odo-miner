@@ -4,5 +4,6 @@
 __pycache__
 src/verilog/odo_gen
 src/pool/fakepool
+src/pool/test/fakepool
 src/projects/*/build_files/*
 src/projects/*/output_files/*
