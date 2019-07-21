@@ -26,6 +26,10 @@ set epoch_results [dict create accepted 0]
 set last_seed ""
 # most recent seed with missing sof file
 set last_warning ""
+# stratum params
+set stratum_idstring ""
+set stratum_ntime ""
+set stratum_nonce2 ""
 
 # change the epoch, and reprogram the fpga to the new seed
 proc advance_epoch {seed} {
@@ -84,7 +88,20 @@ proc set_work {data target seed} {
     }
 }
 
+proc set_work_stratum {data target seed idstring ntime nonce2} {
+    global stratum_idstring
+    global stratum_ntime
+    global stratum_nonce2
+
+    set stratum_idstring $idstring
+    set stratum_ntime $ntime
+    set stratum_nonce2 $nonce2
+
+    set_work $data $target $seed
+}
+
 proc add_result {status} {
+    global config_output
     global epoch_results
     dict incr epoch_results $status
     set count [dict get $epoch_results $status]
@@ -95,18 +112,22 @@ proc add_result {status} {
     } else {
         set type error
     }
-    if {$count <= 10} {
+    if {$config_output eq "verbose"} {
         status_print -type $type "result $status"
-    } elseif {$count <= 100 && ($count % 10) == 0} {
-        status_print -type $type "result (x10) $status"
-    } elseif {($count % 100) == 0} {
-        status_print -type $type "result (x100) $status"
-    }
-    if {$count == 10} {
-        post_message -type $type "Future $status results will be batched in 10s"
-    }
-    if {$count == 100} {
-        post_message -type $type "Future $status results will be batched in 100s"
+    } else {
+        if {$count <= 10} {
+            status_print -type $type "result $status"
+        } elseif {$count <= 100 && ($count % 10) == 0} {
+            status_print -type $type "result (x10) $status"
+        } elseif {($count % 100) == 0} {
+            status_print -type $type "result (x100) $status"
+        }
+        if {$count == 10} {
+            post_message -type $type "Future $status results will be batched in 10s"
+        }
+        if {$count == 100} {
+            post_message -type $type "Future $status results will be batched in 100s"
+        }
     }
 }
 
@@ -120,15 +141,41 @@ proc receive_data {conn} {
     set args [split $data]
     set command [lindex $args 0]
     set args [lrange $args 1 end]
-    # work <data> <target> <seed>
     if {$command eq "work" && [llength $args] == 3} {
+        # work <data> <target> <seed>
         set_work {*}$args
+    } elseif {$command eq "work" && [llength $args] == 6} {
+        # work <data> <target> <seed> <idstring> <ntime> <nonce2>
+        set_work_stratum {*}$args
     # result <status>
     } elseif {$command eq "result" && [llength $args] == 1} {
         add_result {*}$args
+    } elseif {$command eq "connected"} {
+        status_print -type info "connected to $args"
+    } elseif {$command eq "set_subscribe_params"} {
+        # auth after subscribe response
+        pool_auth $conn
+    } elseif {$command eq "authorized"} {
+        status_print -type info "authorized"
+    } elseif {$command eq "set_target"} {
+        status_print -type info "pool target $args"
+    } elseif {$command eq "reconnect"} {
+        status_print -type info "reconnect request received, clear work"
+        clear_fpga_work
     } else {
         status_print -type warning "Unknown command: $command $args"
     }
+    fconfigure $conn -blocking 0
+}
+
+proc submit_nonce {conn nonce} {
+    global stratum_idstring
+    global stratum_ntime
+    global stratum_nonce2
+
+    fconfigure $conn -blocking 1
+    puts $conn "submit_nonce $nonce $stratum_idstring $stratum_ntime $stratum_nonce2"
+    flush $conn
     fconfigure $conn -blocking 0
 }
 
@@ -159,8 +206,16 @@ proc choose_hardware {argv} {
 }
 
 # Create a connection to the pool (or bridge, as will likely be the case)
-proc create_pool_conn {host port} {
-    set conn [socket $host $port]
+proc create_pool_conn {} {
+    global config_host
+    global default_stratum_port
+    global default_solo_port
+    global config_mode
+    if {$config_mode eq "stratum"} {
+        set conn [socket $config_host $default_stratum_port]
+    } else {
+        set conn [socket $config_host $default_solo_port]
+    }
     fconfigure $conn -translation binary
     fconfigure $conn -buffering line
     fconfigure $conn -blocking 0
@@ -168,11 +223,27 @@ proc create_pool_conn {host port} {
     return $conn
 }
 
+proc pool_auth {conn} {
+    global miner_id
+    # leave only numbers from miner_id
+    regsub -all -- {[^0-9]} $miner_id "" worker
+    fconfigure $conn -blocking 1
+    puts $conn "auth $worker"
+    status_print "auth request for worker $worker"
+    flush $conn
+    fconfigure $conn -blocking 0
+}
+
 proc wait_for_nonce {conn} {
+    global config_mode
     while {1} {
         set solved_work [get_result_from_fpga]
         if {$solved_work ne ""} {
-            submit_work $conn $solved_work
+            if {$config_mode eq "stratum"} {
+                submit_nonce $conn $solved_work
+            } else {
+                submit_work $conn $solved_work
+            }
         }
         # Allow pool connection to process
         update
@@ -185,6 +256,5 @@ choose_hardware $argv
 #if {[fpga_init $hardware_name]} {
 #    set last_seed [get_fpga_seed]
 #}
-set conn [create_pool_conn $config_host $config_port]
+set conn [create_pool_conn]
 wait_for_nonce $conn
-
