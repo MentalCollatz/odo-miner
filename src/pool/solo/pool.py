@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import random
 import socket
 import threading
 import time
@@ -50,30 +51,28 @@ class Manager(threading.Thread):
         threading.Thread.__init__(self)
         self.cbscript = cbscript
         self.template = None
-        self.extra_nonce = 0
         self.miners = []
         self.cond = threading.Condition()
-    
+
     def add_miner(self, miner):
         with self.cond:
             self.miners.append(miner)
             self.cond.notify()
-    
+
     def remove_miner(self, miner):
         with self.cond:
             self.miners.remove(miner)
-    
+
     def push_template(self, template):
         with self.cond:
             if template is None:
                 self.template = None
             else:
                 self.template = BlockTemplate(template, self.cbscript)
-            self.extra_nonce = 0
             for miner in self.miners:
                 miner.next_refresh = 0
             self.cond.notify()
-    
+
     def run(self):
         while True:
             with self.cond:
@@ -81,8 +80,8 @@ class Manager(threading.Thread):
                 next_refresh = now + 1000
                 for miner in self.miners:
                     if miner.next_refresh < now:
-                        miner.push_work(self.template, self.extra_nonce)
-                        self.extra_nonce += 1
+                        extra_nonce = random.randrange(2**30)
+                        miner.push_work(self.template, extra_nonce)
                     next_refresh = min(next_refresh, miner.next_refresh)
                 wait_time = max(0, next_refresh - time.time())
                 self.cond.wait(wait_time)
@@ -166,7 +165,7 @@ if __name__ == "__main__":
 
     manager = Manager(config.get("cbscript"))
     manager.start()
-    
+
     callback = lambda t: manager.push_template(t)
     threading.Thread(target=get_templates, args=(callback,)).start()
 
